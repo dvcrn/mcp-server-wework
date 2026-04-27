@@ -2,6 +2,41 @@
 
 MCP server for WeWork bookings and space search.
 
+## Install
+
+Run it directly with npx:
+
+```bash
+npx -y mcp-server-wework
+```
+
+Or install via Go:
+
+```bash
+go install github.com/dvcrn/mcp-server-wework/cmd/mcp-server-wework@latest
+```
+
+## Usage with Claude
+
+Add it to your MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "wework": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-wework"],
+      "env": {
+        "WEWORK_USERNAME": "your-email@example.com",
+        "WEWORK_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+[![Deploy on MCP Nest](https://mcpnest.dev/images/deploy-on-mcpnest.png)](https://mcpnest.dev/deploy?server=mcp-server-wework&package-manager=npx&env%5BWEWORK_USERNAME%5D=&env%5BWEWORK_PASSWORD%5D=)
+
 ## Tools
 
 - `locations` — list WeWork locations in a city
@@ -22,12 +57,6 @@ The server reads credentials from environment variables:
 - `WEWORK_USERNAME`
 - `WEWORK_PASSWORD`
 
-## Installation
-
-```bash
-npm install -g mcp-server-wework
-```
-
 ## Local development
 
 ```bash
@@ -37,18 +66,3 @@ mise run build
 ./dist/mcp-server-wework
 ```
 
-## Example MCP config
-
-```json
-{
-  "mcpServers": {
-    "wework": {
-      "command": "mcp-server-wework",
-      "env": {
-        "WEWORK_USERNAME": "your-email@example.com",
-        "WEWORK_PASSWORD": "your-password"
-      }
-    }
-  }
-}
-```
