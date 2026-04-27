@@ -1,0 +1,24 @@
+[tools]
+go = "1.20.14"
+
+[tasks.test]
+description = "Run Go tests"
+run = "go test ./..."
+
+[tasks.install_gopherjs]
+description = "Install GopherJS locally into .mise/bin"
+run = "mkdir -p .mise/bin && GOBIN=\"$PWD/.mise/bin\" go install github.com/gopherjs/gopherjs@v1.20.1"
+outputs = [".mise/bin/gopherjs"]
+
+[tasks.build_js]
+description = "Build the MCP server for npm via GopherJS"
+depends = ["install_gopherjs"]
+run = "mkdir -p dist && ./.mise/bin/gopherjs build -m -o dist/wework-mcp.js ./cmd/wework-mcp"
+sources = ["cmd/**/*.go", "internal/**/*.go", "go.mod", "go.sum", "mise.toml"]
+outputs = ["dist/wework-mcp.js", "dist/wework-mcp.js.map"]
+
+[tasks.build_native]
+description = "Build a native stdio binary"
+run = "mkdir -p dist && go build -o dist/wework-mcp ./cmd/wework-mcp"
+sources = ["cmd/**/*.go", "internal/**/*.go", "go.mod", "go.sum", "mise.toml"]
+outputs = ["dist/wework-mcp"]
