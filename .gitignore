@@ -2,3 +2,5 @@
 dist
 bin
 .mcp.json
+node_modules
+npm/mcp-server-wework

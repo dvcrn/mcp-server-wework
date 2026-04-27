@@ -116,7 +116,7 @@ function parseChecksums(text) {
       try {
         fs.chmodSync(binPath, 0o755);
       } catch {}
-      return;
+      process.exit(0);
     }
 
     let tarGz = null;
@@ -164,6 +164,7 @@ function parseChecksums(text) {
       fs.unlinkSync(tmpFile);
     } catch {}
     console.log(`postinstall: installed ${exe} to ${outDir}`);
+    process.exit(0);
   } catch (err) {
     console.error(`postinstall error: ${err.message}`);
     process.exit(1);
