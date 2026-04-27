@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	_ "time/tzdata"
 
 	"github.com/dvcrn/mcp-server-wework/internal/app"
 	"github.com/dvcrn/mcp-server-wework/internal/mcp"
