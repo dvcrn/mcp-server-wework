@@ -4,7 +4,7 @@ MCP server for WeWork bookings and space search.
 
 Deploy this server directly to MCP Nest:
 
-[![Deploy on MCP Nest](https://mcpnest.dev/images/deploy-on-mcpnest.png)](https://mcpnest.dev/deploy?server=mcp-server-wework&package-manager=npx&env%5BWEWORK_USERNAME%5D=&env%5BWEWORK_PASSWORD%5D=)
+<a href="https://mcpnest.dev/deploy?server=mcp-server-wework&package-manager=npx&env%5BWEWORK_USERNAME%5D=&env%5BWEWORK_PASSWORD%5D="><img src="https://mcpnest.dev/images/deploy-on-mcpnest.png" width="200" /></a>
 
 ## Install
 
