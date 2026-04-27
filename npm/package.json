@@ -1,0 +1,17 @@
+{
+  "name": "mcp-server-wework",
+  "version": "0.1.0",
+  "description": "MCP server for WeWork bookings and space search",
+  "scripts": {
+    "postinstall": "node postinstall.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "mcp-server-wework": "index.js"
+  },
+  "dependencies": {
+    "semver": "^7.7.4"
+  }
+}

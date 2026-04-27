@@ -1,24 +1,33 @@
 [tools]
-go = "1.20.14"
+go = "1.26.0"
+goreleaser = "2.13.3"
 
 [tasks.test]
 description = "Run Go tests"
 run = "go test ./..."
 
-[tasks.install_gopherjs]
-description = "Install GopherJS locally into .mise/bin"
-run = "mkdir -p .mise/bin && GOBIN=\"$PWD/.mise/bin\" go install github.com/gopherjs/gopherjs@v1.20.1"
-outputs = [".mise/bin/gopherjs"]
+[tasks.build]
+description = "Build a native binary"
+run = "mkdir -p dist && go build -o dist/mcp-server-wework ./cmd/mcp-server-wework"
+sources = ["cmd/**/*.go", "internal/**/*.go", "go.mod", "go.sum"]
+outputs = ["dist/mcp-server-wework"]
 
-[tasks.build_js]
-description = "Build the MCP server for npm via GopherJS"
-depends = ["install_gopherjs"]
-run = "mkdir -p dist && ./.mise/bin/gopherjs build -m -o dist/wework-mcp.js ./cmd/wework-mcp"
-sources = ["cmd/**/*.go", "internal/**/*.go", "go.mod", "go.sum", "mise.toml"]
-outputs = ["dist/wework-mcp.js", "dist/wework-mcp.js.map"]
+[tasks.install]
+description = "Install mcp-server-wework locally"
+run = "go install ./cmd/mcp-server-wework"
 
-[tasks.build_native]
-description = "Build a native stdio binary"
-run = "mkdir -p dist && go build -o dist/wework-mcp ./cmd/wework-mcp"
-sources = ["cmd/**/*.go", "internal/**/*.go", "go.mod", "go.sum", "mise.toml"]
-outputs = ["dist/wework-mcp"]
+[tasks.sync_versions]
+description = "Sync versions from npm/package.json"
+run = "node scripts/sync_versions.mjs"
+
+[tasks.goreleaser_snapshot]
+description = "Build release artifacts via GoReleaser (snapshot)"
+run = "goreleaser release --snapshot --clean --config .goreleaser.yml"
+
+[tasks.goreleaser_release]
+description = "Publish GitHub Release via GoReleaser"
+run = "goreleaser release --clean --config .goreleaser.yml"
+
+[tasks.release]
+description = "Alias for goreleaser_release"
+run = "mise run goreleaser_release"

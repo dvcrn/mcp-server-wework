@@ -2,8 +2,6 @@
 
 MCP server for WeWork bookings and space search.
 
-This package is built from Go and compiled to Node-compatible JavaScript with GopherJS so it can be published directly to npm.
-
 ## Tools
 
 - `locations` — list WeWork locations in a city
@@ -35,8 +33,8 @@ npm install -g mcp-server-wework
 ```bash
 mise install
 mise run test
-mise run build_js
-node bin/wework-mcp.js
+mise run build
+./dist/mcp-server-wework
 ```
 
 ## Example MCP config
