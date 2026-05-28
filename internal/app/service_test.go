@@ -84,3 +84,34 @@ func TestBuildCancelRequest(t *testing.T) {
 		t.Fatalf("unexpected ReservableID: %s", request.ReservableID)
 	}
 }
+
+func TestBuildMarkFavoriteLocationRequestDefaults(t *testing.T) {
+	request := buildMarkFavoriteLocationRequest(MarkFavoriteLocationInput{
+		LocationID:     "location-uuid",
+		SpaceType:      1,
+		ReservableUUID: "reservable-uuid",
+		InventoryName:  "05B144",
+	})
+
+	if request.LocationID != "location-uuid" {
+		t.Fatalf("unexpected LocationID: %s", request.LocationID)
+	}
+	if request.SpaceType != 1 {
+		t.Fatalf("unexpected SpaceType: %d", request.SpaceType)
+	}
+	if request.LocationType != 2 {
+		t.Fatalf("unexpected LocationType: %d", request.LocationType)
+	}
+	if request.LocationAccountType != 2 {
+		t.Fatalf("unexpected LocationAccountType: %d", request.LocationAccountType)
+	}
+	if request.PlatformType != "WEB" {
+		t.Fatalf("unexpected PlatformType: %s", request.PlatformType)
+	}
+	if request.ApplicationType != "WorkplaceOne" {
+		t.Fatalf("unexpected ApplicationType: %s", request.ApplicationType)
+	}
+	if request.ReservableUUID != "reservable-uuid" {
+		t.Fatalf("unexpected ReservableUUID: %s", request.ReservableUUID)
+	}
+}

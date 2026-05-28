@@ -45,6 +45,7 @@ Add it to your MCP configuration:
 - `desks` — list available spaces for a date
 - `find_space` — alias for `desks`
 - `favorites` / `favourites` — list favorite WeWork locations
+- `mark_favorite_location` / `mark_favourite_location` — add or remove a favorite location
 - `bookings` — list upcoming or past bookings
 - `book` — create bookings for one or more dates
 - `quote` — get booking quotes without booking

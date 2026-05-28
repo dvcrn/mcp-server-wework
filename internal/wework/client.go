@@ -198,6 +198,30 @@ func (w *WeWork) GetFavoriteLocations(spaceType int) (*FavoriteLocationsResponse
 	return &result, nil
 }
 
+func (w *WeWork) MarkFavoriteLocation(request MarkFavoriteLocationRequest) (map[string]any, error) {
+	url := "https://members.wework.com/workplaceone/api/recent-and-favorite/mark-as-favorite-location"
+	resp, err := w.doRequest(http.MethodPost, url, request)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+	if len(strings.TrimSpace(string(body))) == 0 {
+		return map[string]any{"ok": true}, nil
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return result, nil
+}
+
 type geoCoords struct {
 	lat        float64
 	lng        float64

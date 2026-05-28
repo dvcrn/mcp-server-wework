@@ -73,6 +73,32 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func firstNonZero(values ...int) int {
+	for _, value := range values {
+		if value != 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func buildMarkFavoriteLocationRequest(input MarkFavoriteLocationInput) wework.MarkFavoriteLocationRequest {
+	return wework.MarkFavoriteLocationRequest{
+		LocationID:          input.LocationID,
+		SpaceType:           input.SpaceType,
+		IsDeleted:           input.IsDeleted,
+		LocationType:        firstNonZero(input.LocationType, 2),
+		LocationAccountType: firstNonZero(input.LocationAccountType, 2),
+		ReservableUUID:      input.ReservableUUID,
+		SpaceID:             input.SpaceID,
+		InventoryName:       input.InventoryName,
+		InventoryImageURL:   input.InventoryImageURL,
+		PlatformType:        firstNonEmpty(input.PlatformType, "WEB"),
+		ApplicationType:     firstNonEmpty(input.ApplicationType, "WorkplaceOne"),
+		FloorID:             input.FloorID,
+	}
+}
+
 type LocationsInput struct {
 	City string `json:"city"`
 }
@@ -85,6 +111,21 @@ type DesksInput struct {
 
 type FavoritesInput struct {
 	SpaceType int `json:"space_type,omitempty"`
+}
+
+type MarkFavoriteLocationInput struct {
+	LocationID          string `json:"location_id"`
+	SpaceType           int    `json:"space_type,omitempty"`
+	IsDeleted           bool   `json:"is_deleted,omitempty"`
+	LocationType        int    `json:"location_type,omitempty"`
+	LocationAccountType int    `json:"location_account_type,omitempty"`
+	ReservableUUID      string `json:"reservable_uuid,omitempty"`
+	SpaceID             int    `json:"space_id,omitempty"`
+	InventoryName       string `json:"inventory_name,omitempty"`
+	InventoryImageURL   string `json:"inventory_image_url,omitempty"`
+	PlatformType        string `json:"platform_type,omitempty"`
+	ApplicationType     string `json:"application_type,omitempty"`
+	FloorID             int    `json:"floor_id,omitempty"`
 }
 
 type BookingsInput struct {
@@ -187,6 +228,11 @@ type FavoritesResult struct {
 	Items []wework.FavoriteLocation `json:"items"`
 }
 
+type MarkFavoriteLocationResult struct {
+	Request  wework.MarkFavoriteLocationRequest `json:"request"`
+	Response map[string]any                     `json:"response"`
+}
+
 type BookingsResult struct {
 	Items []CompactBooking `json:"items"`
 }
@@ -286,6 +332,29 @@ func (s *Service) Favorites(ctx context.Context, input FavoritesInput) (Favorite
 	}
 
 	return FavoritesResult{Items: res.FavoriteLocations}, nil
+}
+
+func (s *Service) MarkFavoriteLocation(ctx context.Context, input MarkFavoriteLocationInput) (MarkFavoriteLocationResult, error) {
+	_ = ctx
+	if strings.TrimSpace(input.LocationID) == "" {
+		return MarkFavoriteLocationResult{}, fmt.Errorf("location_id is required")
+	}
+
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return MarkFavoriteLocationResult{}, err
+	}
+
+	request := buildMarkFavoriteLocationRequest(input)
+	response, err := ww.MarkFavoriteLocation(request)
+	if err != nil {
+		return MarkFavoriteLocationResult{}, err
+	}
+
+	return MarkFavoriteLocationResult{
+		Request:  request,
+		Response: response,
+	}, nil
 }
 
 func (s *Service) Bookings(ctx context.Context, input BookingsInput) (BookingsResult, error) {

@@ -90,6 +90,44 @@ func main() {
 		"Alias for favorites: list the current user's favourite WeWork locations.",
 	))
 
+	markFavoriteLocationTool := func(name, description string) mcp.Tool {
+		return mcp.Tool{
+			Name:        name,
+			Description: description,
+			InputSchema: objSchema(map[string]any{
+				"location_id":           strSchema("WeWork location UUID to mark as a favorite."),
+				"space_type":            intSchema("Space type from WeWork. Use 0 for locations and 1 for office inventory."),
+				"is_deleted":            boolSchema("Set true to remove the favorite instead of adding it."),
+				"location_type":         intSchema("WeWork location type. Defaults to 2."),
+				"location_account_type": intSchema("WeWork location account type. Defaults to 2."),
+				"reservable_uuid":       strSchema("Optional reservable UUID for office inventory favorites."),
+				"space_id":              intSchema("Optional WeWork space ID. Defaults to 0."),
+				"inventory_name":        strSchema("Optional inventory name for office inventory favorites."),
+				"inventory_image_url":   strSchema("Optional inventory image URL for office inventory favorites."),
+				"platform_type":         strSchema("Platform type sent to WeWork. Defaults to WEB."),
+				"application_type":      strSchema("Application type sent to WeWork. Defaults to WorkplaceOne."),
+				"floor_id":              intSchema("Optional floor ID. Defaults to 0."),
+			}, "location_id"),
+			Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
+				var input app.MarkFavoriteLocationInput
+				if err := decode(raw, &input); err != nil {
+					return nil, err
+				}
+				return service.MarkFavoriteLocation(ctx, input)
+			},
+		}
+	}
+
+	server.AddTool(markFavoriteLocationTool(
+		"mark_favorite_location",
+		"Add or remove a WeWork location or office inventory favorite.",
+	))
+
+	server.AddTool(markFavoriteLocationTool(
+		"mark_favourite_location",
+		"Alias for mark_favorite_location: add or remove a WeWork location or office inventory favourite.",
+	))
+
 	server.AddTool(mcp.Tool{
 		Name:        "bookings",
 		Description: "List upcoming bookings, or past bookings with optional date filters.",

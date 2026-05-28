@@ -148,6 +148,52 @@ func TestFavoriteLocationsResponseDecode(t *testing.T) {
 	}
 }
 
+func TestMarkFavoriteLocationRequestMarshal(t *testing.T) {
+	request := MarkFavoriteLocationRequest{
+		LocationID:          "dbccfd91-4873-40e3-a9b9-89b7a7b68549",
+		SpaceType:           1,
+		IsDeleted:           false,
+		LocationType:        2,
+		LocationAccountType: 2,
+		ReservableUUID:      "1a910bb4-3636-4d5f-a68f-641190ed8627",
+		SpaceID:             0,
+		InventoryName:       "05B144",
+		InventoryImageURL:   "https://example.com/inventory.jpg",
+		PlatformType:        "WEB",
+		ApplicationType:     "WorkplaceOne",
+		FloorID:             0,
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("json.Unmarshal returned error: %v", err)
+	}
+
+	if payload["LocationId"] != request.LocationID {
+		t.Fatalf("unexpected LocationId: %v", payload["LocationId"])
+	}
+	if payload["ReservableUUID"] != request.ReservableUUID {
+		t.Fatalf("unexpected ReservableUUID: %v", payload["ReservableUUID"])
+	}
+	if payload["PlatformType"] != "WEB" {
+		t.Fatalf("unexpected PlatformType: %v", payload["PlatformType"])
+	}
+	if payload["ApplicationType"] != "WorkplaceOne" {
+		t.Fatalf("unexpected ApplicationType: %v", payload["ApplicationType"])
+	}
+	if payload["SpaceType"] != float64(1) {
+		t.Fatalf("unexpected SpaceType: %v", payload["SpaceType"])
+	}
+	if payload["IsDeleted"] != false {
+		t.Fatalf("unexpected IsDeleted: %v", payload["IsDeleted"])
+	}
+}
+
 func TestFindCityByFuzzyName(t *testing.T) {
 	cities := []*CityDetailsResponse{
 		{Name: "Tokyo"},

@@ -59,6 +59,21 @@ type FavoriteLocation struct {
 	FloorGUID                string `json:"FloorGuid"`
 }
 
+type MarkFavoriteLocationRequest struct {
+	LocationID          string `json:"LocationId"`
+	SpaceType           int    `json:"SpaceType"`
+	IsDeleted           bool   `json:"IsDeleted"`
+	LocationType        int    `json:"LocationType"`
+	LocationAccountType int    `json:"LocationAccountType"`
+	ReservableUUID      string `json:"ReservableUUID,omitempty"`
+	SpaceID             int    `json:"SpaceId"`
+	InventoryName       string `json:"InventoryName,omitempty"`
+	InventoryImageURL   string `json:"InventoryImageURL,omitempty"`
+	PlatformType        string `json:"PlatformType"`
+	ApplicationType     string `json:"ApplicationType"`
+	FloorID             int    `json:"FloorId"`
+}
+
 type BookingResponse struct {
 	BookingStatus string   `json:"BookingStatus"`
 	Errors        []string `json:"Errors"`
