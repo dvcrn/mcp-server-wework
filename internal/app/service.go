@@ -797,16 +797,9 @@ func buildCancelRequest(booking *wework.Booking, input CancelBookingInput) (wewo
 }
 
 func cancelMailDataFromBooking(booking *wework.Booking) wework.CancelMailData {
-	address := ""
-	country := ""
-	workspaceType := any("")
-	if booking != nil && booking.Reservable != nil {
-		workspaceType = cancelWorkspaceTypeFromTypeName(booking.Reservable.TypeName)
-		if booking.Reservable.Location != nil {
-			address = booking.Reservable.Location.Address.Line1
-			country = booking.Reservable.Location.Address.Country
-		}
-	}
+	address := booking.Reservable.Location.Address.Line1
+	country := booking.Reservable.Location.Address.Country
+	workspaceType := cancelWorkspaceTypeFromTypeName(booking.Reservable.TypeName)
 	return wework.CancelMailData{
 		WorkspaceType:      workspaceType,
 		DayFormatted:       booking.StartsAt.Time.Format("Monday, January 2") + ordinalSuffix(booking.StartsAt.Time.Day()),
