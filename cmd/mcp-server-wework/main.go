@@ -174,7 +174,7 @@ func main() {
 			"booking_type":          intSchema("Optional override for bookingType. 0=conference room, 2=private office, 4=shared workspace."),
 			"reservation_id":        strSchema("Optional override for reservationId."),
 			"is_on_demand":          boolSchema("Optional override for the isOnDemand query param. Defaults to false."),
-			"platform_type":         intSchema("Optional override for platFormType. Defaults to 2 (iOS app)."),
+			"platform_type":         intSchema("Optional override for platFormType. Defaults to 1 (web app)."),
 		}, "booking_uuid"),
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var input app.CancelBookingInput

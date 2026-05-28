@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -560,7 +561,7 @@ func (s *Service) CancelBooking(ctx context.Context, input CancelBookingInput) (
 
 	platformType := input.PlatformType
 	if platformType == 0 {
-		platformType = platformIOS
+		platformType = platformWeb
 	}
 
 	response, err := ww.CancelBooking(request, input.IsOnDemand, platformType)
@@ -746,14 +747,13 @@ func buildCancelRequest(booking *wework.Booking, input CancelBookingInput) (wewo
 	bookingLocationType := booking.Reservable.Location.SourceType
 	if input.BookingLocationType != nil {
 		bookingLocationType = *input.BookingLocationType
+	} else if bookingLocationType == 0 && booking.Reservable.TypeName == "SharedWorkspace" {
+		bookingLocationType = 2
 	}
 
 	bookingID := input.BookingID
 	if bookingID == "" {
 		bookingID = booking.UUID
-		if booking.IsFromKube && booking.KubeBookingExternalReference != "" {
-			bookingID = booking.KubeBookingExternalReference
-		}
 	}
 
 	bookingType := cancelBookingTypeSharedDesk
@@ -763,47 +763,91 @@ func buildCancelRequest(booking *wework.Booking, input CancelBookingInput) (wewo
 		bookingType = cancelBookingTypeFromTypeName(booking.Reservable.TypeName)
 	}
 
-	reservationID := firstNonEmpty(input.ReservationID, booking.UUID)
+	reservationID := firstNonEmpty(input.ReservationID, booking.KubeBookingExternalReference, booking.UUID)
 	locationID := firstNonEmpty(input.LocationID, booking.Reservable.Location.UUID)
 	reservableID := firstNonEmpty(input.ReservableID, booking.Reservable.UUID)
-	creditsUsed := ""
+	spaceID := reservableID
+	if booking.Reservable.CwmSpaceID > 0 {
+		spaceID = strconv.Itoa(booking.Reservable.CwmSpaceID)
+	}
+	creditsUsed := any(0)
 	if booking.CreditOrder != nil {
-		creditsUsed = booking.CreditOrder.Price
+		if parsed, err := strconv.ParseFloat(booking.CreditOrder.Price, 64); err == nil {
+			creditsUsed = parsed
+		} else {
+			creditsUsed = booking.CreditOrder.Price
+		}
 	}
 
 	return wework.CancelBookingRequest{
 		BookingID:           bookingID,
 		BookingLocationType: bookingLocationType,
-		ReservableID:        reservableID,
-		StartTime:           booking.StartsAt.Time.Format(time.RFC3339),
-		EndTime:             booking.EndsAt.Time.Format(time.RFC3339),
 		CreditsUsed:         creditsUsed,
+		StartTime:           formatCancelDateTime(booking.StartsAt.Time),
+		EndTime:             formatCancelDateTime(booking.EndsAt.Time),
 		LocationID:          locationID,
-		MailParams:          cancelMailDataFromBooking(booking),
+		ReservableID:        reservableID,
+		IsBookingApprovalOn: booking.IsBookingApprovalOn || booking.IsBookingApprovalOnLower,
 		BookingType:         bookingType,
+		SpaceID:             spaceID,
+		CancellationNote:    "",
+		MailParams:          cancelMailDataFromBooking(booking),
 		ReservationID:       reservationID,
 	}, nil
 }
 
 func cancelMailDataFromBooking(booking *wework.Booking) wework.CancelMailData {
-	locationName := ""
 	address := ""
-	workspaceType := ""
+	country := ""
+	workspaceType := any("")
 	if booking != nil && booking.Reservable != nil {
-		workspaceType = booking.Reservable.TypeName
+		workspaceType = cancelWorkspaceTypeFromTypeName(booking.Reservable.TypeName)
 		if booking.Reservable.Location != nil {
-			locationName = booking.Reservable.Location.Name
 			address = booking.Reservable.Location.Address.Line1
+			country = booking.Reservable.Location.Address.Country
 		}
 	}
-	locationAddress := strings.TrimSpace(strings.TrimSpace(locationName + " " + address))
 	return wework.CancelMailData{
 		WorkspaceType:      workspaceType,
-		DayFormatted:       booking.StartsAt.Time.Format("Monday, January 2"),
-		StartTimeFormatted: booking.StartsAt.Time.Format("3:04 PM"),
-		EndTimeFormatted:   booking.EndsAt.Time.Format("3:04 PM"),
+		DayFormatted:       booking.StartsAt.Time.Format("Monday, January 2") + ordinalSuffix(booking.StartsAt.Time.Day()),
+		StartTimeFormatted: formatCancelDateTime(booking.StartsAt.Time),
+		EndTimeFormatted:   formatCancelDateTime(booking.EndsAt.Time),
 		FloorAddress:       "",
-		LocationAddress:    locationAddress,
+		LocationAddress:    address,
+		LocationCountry:    country,
+	}
+}
+
+func formatCancelDateTime(t time.Time) string {
+	return t.Format("2006-01-02T15:04:05.000")
+}
+
+func ordinalSuffix(day int) string {
+	if day%100 >= 11 && day%100 <= 13 {
+		return "th"
+	}
+	switch day % 10 {
+	case 1:
+		return "st"
+	case 2:
+		return "nd"
+	case 3:
+		return "rd"
+	default:
+		return "th"
+	}
+}
+
+func cancelWorkspaceTypeFromTypeName(typeName string) any {
+	switch typeName {
+	case "ConferenceRoom":
+		return 0
+	case "PrivateOffice":
+		return 2
+	case "SharedWorkspace":
+		return 1
+	default:
+		return typeName
 	}
 }
 

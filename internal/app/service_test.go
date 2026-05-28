@@ -44,15 +44,17 @@ func TestParseDateSelection(t *testing.T) {
 
 func TestBuildCancelRequest(t *testing.T) {
 	booking := &wework.Booking{
-		UUID:     "booking-uuid",
-		StartsAt: wework.CustomTime{Time: time.Date(2026, 4, 6, 8, 30, 0, 0, time.UTC)},
-		EndsAt:   wework.CustomTime{Time: time.Date(2026, 4, 6, 20, 0, 0, 0, time.UTC)},
+		UUID:                         "booking-uuid",
+		KubeBookingExternalReference: "reservation-uuid",
+		StartsAt:                     wework.CustomTime{Time: time.Date(2026, 4, 6, 8, 30, 0, 0, time.UTC)},
+		EndsAt:                       wework.CustomTime{Time: time.Date(2026, 4, 6, 20, 0, 0, 0, time.UTC)},
 		CreditOrder: &wework.CreditOrder{
 			Price: "2",
 		},
 		Reservable: &wework.SharedWorkspace{
-			UUID:     "space-uuid",
-			TypeName: "PrivateOffice",
+			UUID:       "space-uuid",
+			TypeName:   "PrivateOffice",
+			CwmSpaceID: 15769,
 			Location: &wework.SharedWorkspaceLocation{
 				UUID:       "location-uuid",
 				Name:       "WeWork Bryant Park",
@@ -82,5 +84,57 @@ func TestBuildCancelRequest(t *testing.T) {
 	}
 	if request.ReservableID != "space-uuid" {
 		t.Fatalf("unexpected ReservableID: %s", request.ReservableID)
+	}
+	if request.ReservationID != "reservation-uuid" {
+		t.Fatalf("unexpected ReservationID: %s", request.ReservationID)
+	}
+	if request.SpaceID != "15769" {
+		t.Fatalf("unexpected SpaceID: %s", request.SpaceID)
+	}
+	if request.CancellationNote != "" {
+		t.Fatalf("unexpected CancellationNote: %s", request.CancellationNote)
+	}
+	if request.StartTime != "2026-04-06T08:30:00.000" {
+		t.Fatalf("unexpected StartTime: %s", request.StartTime)
+	}
+	if request.MailParams.StartTimeFormatted != request.StartTime {
+		t.Fatalf("unexpected mail start time: %s", request.MailParams.StartTimeFormatted)
+	}
+}
+
+func TestBuildCancelRequestDefaultsSharedWorkspaceLocationType(t *testing.T) {
+	booking := &wework.Booking{
+		UUID:                         "9910460",
+		KubeBookingExternalReference: "aa144199-594e-4131-9829-6470a7943232",
+		StartsAt:                     wework.CustomTime{Time: time.Date(2026, 5, 31, 6, 0, 0, 0, time.UTC)},
+		EndsAt:                       wework.CustomTime{Time: time.Date(2026, 5, 31, 23, 59, 0, 0, time.UTC)},
+		Reservable: &wework.SharedWorkspace{
+			UUID:     "c4ce9457-c836-4b1b-86bc-661defc9bc4e",
+			TypeName: "SharedWorkspace",
+			Location: &wework.SharedWorkspaceLocation{
+				UUID: "20242b8b-d507-44e4-942e-1d89814bbf38",
+				Address: wework.Address{
+					Line1:   "10 York Rd ",
+					Country: "GBR",
+				},
+			},
+		},
+	}
+
+	request, err := buildCancelRequest(booking, CancelBookingInput{BookingUUID: booking.UUID})
+	if err != nil {
+		t.Fatalf("buildCancelRequest returned error: %v", err)
+	}
+	if request.BookingID != "9910460" {
+		t.Fatalf("unexpected BookingID: %s", request.BookingID)
+	}
+	if request.ReservationID != "aa144199-594e-4131-9829-6470a7943232" {
+		t.Fatalf("unexpected ReservationID: %s", request.ReservationID)
+	}
+	if request.BookingLocationType != 2 {
+		t.Fatalf("unexpected BookingLocationType: %d", request.BookingLocationType)
+	}
+	if request.MailParams.WorkspaceType != 1 {
+		t.Fatalf("unexpected WorkspaceType: %#v", request.MailParams.WorkspaceType)
 	}
 }

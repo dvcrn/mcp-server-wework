@@ -41,23 +41,27 @@ type BookingResponse struct {
 type CancelBookingRequest struct {
 	BookingID           string         `json:"bookingId"`
 	BookingLocationType int            `json:"bookingLocationType"`
-	ReservableID        string         `json:"reservableId,omitempty"`
+	CreditsUsed         any            `json:"creditsUsed"`
 	StartTime           string         `json:"startTime,omitempty"`
 	EndTime             string         `json:"endTime,omitempty"`
-	CreditsUsed         string         `json:"creditsUsed,omitempty"`
 	LocationID          string         `json:"locationId,omitempty"`
-	MailParams          CancelMailData `json:"mailParams,omitempty"`
+	ReservableID        string         `json:"reservableId,omitempty"`
+	IsBookingApprovalOn bool           `json:"isBookingApprovalOn"`
 	BookingType         int            `json:"bookingType,omitempty"`
+	SpaceID             string         `json:"spaceId,omitempty"`
+	CancellationNote    string         `json:"cancellationNote"`
+	MailParams          CancelMailData `json:"mailParams,omitempty"`
 	ReservationID       string         `json:"reservationId,omitempty"`
 }
 
 type CancelMailData struct {
-	WorkspaceType      string `json:"workspaceType,omitempty"`
+	WorkspaceType      any    `json:"workspaceType,omitempty"`
 	DayFormatted       string `json:"dayFormatted,omitempty"`
 	StartTimeFormatted string `json:"startTimeFormatted,omitempty"`
 	EndTimeFormatted   string `json:"endTimeFormatted,omitempty"`
 	FloorAddress       string `json:"floorAddress,omitempty"`
 	LocationAddress    string `json:"locationAddress,omitempty"`
+	LocationCountry    string `json:"locationCountry,omitempty"`
 }
 
 type GeoLocation struct {
@@ -96,6 +100,7 @@ type Booking struct {
 	IsFromCwm                    bool             `json:"isFromCwm"`
 	IsBookingConfirmationPending bool             `json:"isBookingConfirmationPending"`
 	IsBookingApprovalOn          bool             `json:"IsBookingApprovalOn"`
+	IsBookingApprovalOnLower     bool             `json:"isBookingApprovalOn"`
 	SameDayCancelPolicy          bool             `json:"sameDayCancelPolicy"`
 	// KubeCreatedOnDate            *time.Time      `json:"kubeCreatedOnDate,omitempty"`
 	// KubeModifiedOnDate           *time.Time      `json:"kubeModifiedOnDate,omitempty"`
