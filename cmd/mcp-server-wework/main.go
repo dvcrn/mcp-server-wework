@@ -63,6 +63,33 @@ func main() {
 		},
 	})
 
+	favoritesTool := func(name, description string) mcp.Tool {
+		return mcp.Tool{
+			Name:        name,
+			Description: description,
+			InputSchema: objSchema(map[string]any{
+				"space_type": intSchema("Space type to request. Defaults to 0 for workspace locations."),
+			}),
+			Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
+				var input app.FavoritesInput
+				if err := decode(raw, &input); err != nil {
+					return nil, err
+				}
+				return service.Favorites(ctx, input)
+			},
+		}
+	}
+
+	server.AddTool(favoritesTool(
+		"favorites",
+		"List the current user's favorite WeWork locations.",
+	))
+
+	server.AddTool(favoritesTool(
+		"favourites",
+		"Alias for favorites: list the current user's favourite WeWork locations.",
+	))
+
 	server.AddTool(mcp.Tool{
 		Name:        "bookings",
 		Description: "List upcoming bookings, or past bookings with optional date filters.",

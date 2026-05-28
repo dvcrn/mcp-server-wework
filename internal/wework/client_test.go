@@ -1,6 +1,7 @@
 package wework
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -97,6 +98,53 @@ func TestGetQuoteParameters(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestFavoriteLocationsResponseDecode(t *testing.T) {
+	body := []byte(`{
+		"FavoriteLocations": [
+			{
+				"SpaceName": "",
+				"Id": "favorite-id",
+				"Hmy": 173942,
+				"SpaceId": "",
+				"LocationId": "location-id",
+				"FloorId": 0,
+				"LocationName": "10 York Rd",
+				"LocationAddress": "10 York Rd London GB SE1 7ND",
+				"ItemImage": "https://example.com/image.jpg",
+				"LocationType": 2,
+				"SpaceType": 0,
+				"ItemType": 1,
+				"LocationAccountType": 2,
+				"TimeZoneIanaId": "Europe/London",
+				"AccountUUID": "account-id",
+				"AllowBookingInOtherZones": false,
+				"OverrideZoneBeforeHours": 0,
+				"City": "London",
+				"FloorGuid": ""
+			}
+		]
+	}`)
+
+	var response FavoriteLocationsResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		t.Fatalf("json.Unmarshal returned error: %v", err)
+	}
+	if len(response.FavoriteLocations) != 1 {
+		t.Fatalf("expected 1 favorite location, got %d", len(response.FavoriteLocations))
+	}
+
+	location := response.FavoriteLocations[0]
+	if location.LocationID != "location-id" {
+		t.Fatalf("unexpected LocationID: %s", location.LocationID)
+	}
+	if location.LocationName != "10 York Rd" {
+		t.Fatalf("unexpected LocationName: %s", location.LocationName)
+	}
+	if location.TimeZoneIanaID != "Europe/London" {
+		t.Fatalf("unexpected TimeZoneIanaID: %s", location.TimeZoneIanaID)
 	}
 }
 

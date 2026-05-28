@@ -83,6 +83,10 @@ type DesksInput struct {
 	Date         string `json:"date,omitempty"`
 }
 
+type FavoritesInput struct {
+	SpaceType int `json:"space_type,omitempty"`
+}
+
 type BookingsInput struct {
 	Past      bool   `json:"past,omitempty"`
 	StartDate string `json:"start_date,omitempty"`
@@ -179,6 +183,10 @@ type DesksResult struct {
 	Items []AvailableSpace `json:"items"`
 }
 
+type FavoritesResult struct {
+	Items []wework.FavoriteLocation `json:"items"`
+}
+
 type BookingsResult struct {
 	Items []CompactBooking `json:"items"`
 }
@@ -263,6 +271,21 @@ func (s *Service) Desks(ctx context.Context, input DesksInput) (DesksResult, err
 	}
 
 	return DesksResult{Items: rows}, nil
+}
+
+func (s *Service) Favorites(ctx context.Context, input FavoritesInput) (FavoritesResult, error) {
+	_ = ctx
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return FavoritesResult{}, err
+	}
+
+	res, err := ww.GetFavoriteLocations(input.SpaceType)
+	if err != nil {
+		return FavoritesResult{}, err
+	}
+
+	return FavoritesResult{Items: res.FavoriteLocations}, nil
 }
 
 func (s *Service) Bookings(ctx context.Context, input BookingsInput) (BookingsResult, error) {

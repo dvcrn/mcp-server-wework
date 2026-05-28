@@ -32,6 +32,33 @@ type LocationsByGeoResponse struct {
 	LocationsByGeo []GeoLocation `json:"locationsByGeo"`
 }
 
+type FavoriteLocationsResponse struct {
+	FavoriteLocations []FavoriteLocation `json:"FavoriteLocations"`
+	RecentLocations   []FavoriteLocation `json:"RecentLocations,omitempty"`
+}
+
+type FavoriteLocation struct {
+	SpaceName                string `json:"SpaceName"`
+	ID                       string `json:"Id"`
+	Hmy                      int    `json:"Hmy"`
+	SpaceID                  string `json:"SpaceId"`
+	LocationID               string `json:"LocationId"`
+	FloorID                  int    `json:"FloorId"`
+	LocationName             string `json:"LocationName"`
+	LocationAddress          string `json:"LocationAddress"`
+	ItemImage                string `json:"ItemImage"`
+	LocationType             int    `json:"LocationType"`
+	SpaceType                int    `json:"SpaceType"`
+	ItemType                 int    `json:"ItemType"`
+	LocationAccountType      int    `json:"LocationAccountType"`
+	TimeZoneIanaID           string `json:"TimeZoneIanaId"`
+	AccountUUID              string `json:"AccountUUID"`
+	AllowBookingInOtherZones bool   `json:"AllowBookingInOtherZones"`
+	OverrideZoneBeforeHours  int    `json:"OverrideZoneBeforeHours"`
+	City                     string `json:"City"`
+	FloorGUID                string `json:"FloorGuid"`
+}
+
 type BookingResponse struct {
 	BookingStatus string   `json:"BookingStatus"`
 	Errors        []string `json:"Errors"`

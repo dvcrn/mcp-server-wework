@@ -178,6 +178,26 @@ func (w *WeWork) GetLocationsByGeoCoords(lat, lng float64, delta float64) (*Loca
 	return &result, nil
 }
 
+func (w *WeWork) GetFavoriteLocations(spaceType int) (*FavoriteLocationsResponse, error) {
+	params := url.Values{}
+	params.Add("requestType", "1")
+	params.Add("spaceType", strconv.Itoa(spaceType))
+
+	url := "https://members.wework.com/workplaceone/api/recent-and-favorite/v2/get-recents-and-favorite-location-data?" + params.Encode()
+	resp, err := w.doRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result FavoriteLocationsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &result, nil
+}
+
 type geoCoords struct {
 	lat        float64
 	lng        float64
