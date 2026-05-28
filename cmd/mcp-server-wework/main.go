@@ -185,6 +185,43 @@ func main() {
 		},
 	})
 
+	server.AddTool(mcp.Tool{
+		Name:        "print_queue",
+		Description: "Fetch the WeWork print hub queue. job_ids defaults to 0, which returns the current queue.",
+		InputSchema: objSchema(map[string]any{
+			"job_ids": strSchema("Comma-separated print job IDs to fetch. Defaults to 0."),
+		}),
+		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
+			var input app.PrintQueueInput
+			if err := decode(raw, &input); err != nil {
+				return nil, err
+			}
+			return service.PrintQueue(ctx, input)
+		},
+	})
+
+	server.AddTool(mcp.Tool{
+		Name:        "add_print_job",
+		Description: "Upload a local file to the WeWork print hub queue.",
+		InputSchema: objSchema(map[string]any{
+			"file_path":             strSchema("Absolute or relative path to the local file to upload."),
+			"copies":                intSchema("Number of copies. Defaults to 1."),
+			"force_media_size":      strSchema("Printer media size value. Defaults to null."),
+			"orientation_requested": strSchema("Print orientation, e.g. portrait or landscape. Defaults to portrait."),
+			"print_color_mode":      strSchema("Print color mode, e.g. monochrome or color. Defaults to monochrome."),
+			"sides":                 strSchema("Duplex setting, e.g. one-sided or two-sided-long-edge. Defaults to one-sided."),
+			"job_name":              strSchema("Optional print job name. Defaults to the file name."),
+			"content_type":          strSchema("Optional MIME type override. Defaults from the file extension."),
+		}, "file_path"),
+		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
+			var input app.AddPrintJobInput
+			if err := decode(raw, &input); err != nil {
+				return nil, err
+			}
+			return service.AddPrintJob(ctx, input)
+		},
+	})
+
 	if err := mcp.Run(context.Background(), server); err != nil {
 		log.Fatal(err)
 	}

@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -77,6 +79,10 @@ func extractUUIDFromToken(token string) string {
 	return ""
 }
 
+func escapeQuotes(value string) string {
+	return strings.NewReplacer("\\", "\\\\", `"`, "\\\"").Replace(value)
+}
+
 func (w *WeWork) doRequest(method, url string, data any) (*http.Response, error) {
 	var body []byte
 	var err error
@@ -122,6 +128,131 @@ func (w *WeWork) doRequest(method, url string, data any) (*http.Response, error)
 	}
 
 	return resp, nil
+}
+
+func (w *WeWork) doPrintHubRequest(method, requestURL string, body io.Reader, contentType string) (*http.Response, error) {
+	req, err := http.NewRequest(method, requestURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+	req.Header.Set("Accept", "application/json, text/plain, */*")
+	req.Header.Set("fe-pg", "/workplaceone/content2/print")
+	req.Header.Set("Referer", "https://members.wework.com/workplaceone/content2/print")
+	req.Header.Set("Request-Source", "MemberWeb/WorkplaceOne/Prod")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+
+	resp, err := w.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %v", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		defer resp.Body.Close()
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		return nil, fmt.Errorf("request failed with status code: %d: %s", resp.StatusCode, clipBody(buf.Bytes()))
+	}
+
+	return resp, nil
+}
+
+func (w *WeWork) GetPrintQueue(jobIDs string) (*PrintQueueResponse, error) {
+	jobIDs = strings.TrimSpace(jobIDs)
+	if jobIDs == "" {
+		jobIDs = "0"
+	}
+
+	params := url.Values{}
+	params.Add("jobIds", jobIDs)
+
+	requestURL := "https://members.wework.com/workplaceone/api/wework-yardi/print-hub/get-print-queue?" + params.Encode()
+	resp, err := w.doPrintHubRequest(http.MethodGet, requestURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result PrintQueueResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode print queue response: %v", err)
+	}
+
+	return &result, nil
+}
+
+func (w *WeWork) AddToPrintQueue(input AddPrintJobRequest) (*PrintJob, error) {
+	if len(input.FileBytes) == 0 {
+		return nil, fmt.Errorf("file bytes are required")
+	}
+	if strings.TrimSpace(input.FileName) == "" {
+		return nil, fmt.Errorf("file name is required")
+	}
+	if input.Copies <= 0 {
+		input.Copies = 1
+	}
+	if strings.TrimSpace(input.ForceMediaSize) == "" {
+		input.ForceMediaSize = "null"
+	}
+	if strings.TrimSpace(input.OrientationRequested) == "" {
+		input.OrientationRequested = "portrait"
+	}
+	if strings.TrimSpace(input.PrintColorMode) == "" {
+		input.PrintColorMode = "monochrome"
+	}
+	if strings.TrimSpace(input.Sides) == "" {
+		input.Sides = "one-sided"
+	}
+	if strings.TrimSpace(input.JobName) == "" {
+		input.JobName = input.FileName
+	}
+	if strings.TrimSpace(input.FileContentType) == "" {
+		input.FileContentType = "application/octet-stream"
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	fields := map[string]string{
+		"copies":               strconv.Itoa(input.Copies),
+		"forceMediaSize":       input.ForceMediaSize,
+		"orientationRequested": input.OrientationRequested,
+		"printColorMode":       input.PrintColorMode,
+		"sides":                input.Sides,
+		"jobName":              input.JobName,
+	}
+	for key, value := range fields {
+		if err := writer.WriteField(key, value); err != nil {
+			return nil, fmt.Errorf("failed to write multipart field %s: %w", key, err)
+		}
+	}
+
+	fileHeader := make(textproto.MIMEHeader)
+	fileHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, escapeQuotes(input.FileName)))
+	fileHeader.Set("Content-Type", input.FileContentType)
+	fileWriter, err := writer.CreatePart(fileHeader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create multipart file part: %w", err)
+	}
+	if _, err := fileWriter.Write(input.FileBytes); err != nil {
+		return nil, fmt.Errorf("failed to write multipart file: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to finalize multipart request: %w", err)
+	}
+
+	requestURL := "https://members.wework.com/workplaceone/api/wework-yardi/print-hub/add-to-print-queue"
+	resp, err := w.doPrintHubRequest(http.MethodPost, requestURL, &body, writer.FormDataContentType())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result PrintJob
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode add print job response: %v", err)
+	}
+
+	return &result, nil
 }
 
 func (w *WeWork) GetLocationsByGeo(city string) (*LocationsByGeoResponse, error) {

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"mime"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -128,6 +130,21 @@ type CancelBookingInput struct {
 	PlatformType        int    `json:"platform_type,omitempty"`
 }
 
+type PrintQueueInput struct {
+	JobIDs string `json:"job_ids,omitempty"`
+}
+
+type AddPrintJobInput struct {
+	FilePath             string `json:"file_path"`
+	Copies               int    `json:"copies,omitempty"`
+	ForceMediaSize       string `json:"force_media_size,omitempty"`
+	OrientationRequested string `json:"orientation_requested,omitempty"`
+	PrintColorMode       string `json:"print_color_mode,omitempty"`
+	Sides                string `json:"sides,omitempty"`
+	JobName              string `json:"job_name,omitempty"`
+	ContentType          string `json:"content_type,omitempty"`
+}
+
 type AvailableSpace struct {
 	Location        string `json:"location"`
 	ReservableID    string `json:"reservable_id"`
@@ -200,6 +217,12 @@ type CancelBookingOutput struct {
 	BookingUUID string                      `json:"booking_uuid"`
 	Request     wework.CancelBookingRequest `json:"request"`
 	Response    map[string]any              `json:"response"`
+}
+
+type AddPrintJobOutput struct {
+	FilePath string           `json:"file_path"`
+	Request  AddPrintJobInput `json:"request"`
+	Job      *wework.PrintJob `json:"job"`
 }
 
 func (s *Service) Locations(ctx context.Context, input LocationsInput) (LocationsResult, error) {
@@ -572,6 +595,87 @@ func (s *Service) CancelBooking(ctx context.Context, input CancelBookingInput) (
 		BookingUUID: input.BookingUUID,
 		Request:     request,
 		Response:    response,
+	}, nil
+}
+
+func (s *Service) PrintQueue(ctx context.Context, input PrintQueueInput) (*wework.PrintQueueResponse, error) {
+	_ = ctx
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return nil, err
+	}
+	return ww.GetPrintQueue(input.JobIDs)
+}
+
+func (s *Service) AddPrintJob(ctx context.Context, input AddPrintJobInput) (AddPrintJobOutput, error) {
+	_ = ctx
+	filePath := strings.TrimSpace(input.FilePath)
+	if filePath == "" {
+		return AddPrintJobOutput{}, fmt.Errorf("file_path is required")
+	}
+
+	fileBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return AddPrintJobOutput{}, fmt.Errorf("failed to read file_path: %w", err)
+	}
+
+	fileName := filepath.Base(filePath)
+	contentType := strings.TrimSpace(input.ContentType)
+	if contentType == "" {
+		contentType = mime.TypeByExtension(filepath.Ext(filePath))
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return AddPrintJobOutput{}, err
+	}
+
+	jobName := strings.TrimSpace(input.JobName)
+	if jobName == "" {
+		jobName = fileName
+	}
+
+	job, err := ww.AddToPrintQueue(wework.AddPrintJobRequest{
+		Copies:               input.Copies,
+		ForceMediaSize:       input.ForceMediaSize,
+		OrientationRequested: input.OrientationRequested,
+		PrintColorMode:       input.PrintColorMode,
+		Sides:                input.Sides,
+		JobName:              jobName,
+		FileName:             fileName,
+		FileContentType:      contentType,
+		FileBytes:            fileBytes,
+	})
+	if err != nil {
+		return AddPrintJobOutput{}, err
+	}
+
+	request := input
+	request.JobName = jobName
+	request.ContentType = contentType
+	if request.Copies <= 0 {
+		request.Copies = 1
+	}
+	if strings.TrimSpace(request.ForceMediaSize) == "" {
+		request.ForceMediaSize = "null"
+	}
+	if strings.TrimSpace(request.OrientationRequested) == "" {
+		request.OrientationRequested = "portrait"
+	}
+	if strings.TrimSpace(request.PrintColorMode) == "" {
+		request.PrintColorMode = "monochrome"
+	}
+	if strings.TrimSpace(request.Sides) == "" {
+		request.Sides = "one-sided"
+	}
+
+	return AddPrintJobOutput{
+		FilePath: filePath,
+		Request:  request,
+		Job:      job,
 	}, nil
 }
 

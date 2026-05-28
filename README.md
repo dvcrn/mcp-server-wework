@@ -51,6 +51,8 @@ Add it to your MCP configuration:
 - `me` — fetch the current user profile
 - `calendar` — generate an ICS payload from bookings
 - `cancel_booking` — cancel an upcoming booking by booking UUID
+- `print_queue` — fetch the current WeWork print hub queue
+- `add_print_job` — upload a local file to the WeWork print hub queue
 
 ## Credentials
 
@@ -67,4 +69,3 @@ mise run test
 mise run build
 ./dist/mcp-server-wework
 ```
-

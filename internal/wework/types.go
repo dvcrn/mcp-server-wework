@@ -51,6 +51,76 @@ type CancelBookingRequest struct {
 	ReservationID       string         `json:"reservationId,omitempty"`
 }
 
+type PrintQueueResponse struct {
+	Content []PrintJob `json:"content"`
+	Page    struct {
+		TotalElements int `json:"totalElements"`
+	} `json:"page"`
+}
+
+type PrintJob struct {
+	CreatedTime                    CustomTime `json:"createdTime"`
+	LastUpdatedTime                CustomTime `json:"lastUpdatedTime"`
+	InternalJobStatus              string     `json:"internalJobStatus"`
+	Status                         string     `json:"status"`
+	PagesInJob                     int        `json:"pagesInJob"`
+	JobName                        string     `json:"jobName"`
+	Collated                       bool       `json:"collated"`
+	Copies                         int        `json:"copies"`
+	ForceMediaSize                 any        `json:"forceMediaSize"`
+	MediaSizes                     []string   `json:"mediaSizes"`
+	OrientationRequested           string     `json:"orientationRequested"`
+	PageDelivery                   any        `json:"pageDelivery"`
+	JobURI                         any        `json:"jobUri"`
+	PrintColorMode                 string     `json:"printColorMode"`
+	PrinterResolution              any        `json:"printerResolution"`
+	PrintQuality                   string     `json:"printQuality"`
+	Sides                          string     `json:"sides"`
+	PrintScaling                   any        `json:"printScaling"`
+	JobState                       any        `json:"jobState"`
+	ImpressionsCompleted           int        `json:"impressionsCompleted"`
+	MediaSheetsCompleted           int        `json:"mediaSheetsCompleted"`
+	UserID                         string     `json:"userId"`
+	PrinterID                      any        `json:"printerId"`
+	IsSubmittedDocumentPreRendered bool       `json:"isSubmittedDocumentPreRendered"`
+	SubmittedDocumentMimeType      string     `json:"submittedDocumentMimeType"`
+	RenderedDocumentsRequested     int        `json:"renderedDocumentsRequested"`
+	RenderedDocuments              any        `json:"renderedDocuments"`
+	ExpiryTime                     CustomTime `json:"expiryTime"`
+	AirPrintProfileID              any        `json:"airPrintProfileId"`
+	UploadDocuments                any        `json:"uploadDocuments"`
+	S3Region                       string     `json:"s3Region"`
+	QueuedForLaterRelease          bool       `json:"queuedForLaterRelease"`
+	NonPDFRenderingSupport         bool       `json:"nonPdfRenderingSupport"`
+	UserAccount                    any        `json:"userAccount"`
+	ReleaseIntent                  string     `json:"releaseIntent"`
+	ReleasePrinterID               any        `json:"releasePrinterId"`
+	MediaCol                       any        `json:"mediaCol"`
+	PrinterName                    any        `json:"printerName"`
+	StratusResourceInfo            any        `json:"stratusResourceInfo"`
+	Borderless                     bool       `json:"borderless"`
+	MultipleDocumentHandling       any        `json:"multipleDocumentHandling"`
+	NumberUp                       any        `json:"numberUp"`
+	HPPCVersionMajor               any        `json:"hpPcVersionMajor"`
+	HPPCVersionMinor               any        `json:"hpPcVersionMinor"`
+	HPPrintQuality                 any        `json:"hpPrintQuality"`
+	JobOrigin                      any        `json:"jobOrigin"`
+	ID                             string     `json:"id"`
+	IsErrorRetryable               bool       `json:"isErrorRetryable"`
+}
+
+type AddPrintJobRequest struct {
+	Copies               int
+	ForceMediaSize       string
+	OrientationRequested string
+	PrintColorMode       string
+	Sides                string
+	JobName              string
+	FileName             string
+	FileContentType      string
+	FileBytes            []byte
+}
+
 type CancelMailData struct {
 	WorkspaceType      string `json:"workspaceType,omitempty"`
 	DayFormatted       string `json:"dayFormatted,omitempty"`
