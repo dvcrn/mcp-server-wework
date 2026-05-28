@@ -86,32 +86,77 @@ func TestBuildCancelRequest(t *testing.T) {
 }
 
 func TestBuildMarkFavoriteLocationRequestDefaults(t *testing.T) {
-	request := buildMarkFavoriteLocationRequest(MarkFavoriteLocationInput{
-		LocationID:     "location-uuid",
-		SpaceType:      1,
-		ReservableUUID: "reservable-uuid",
-		InventoryName:  "05B144",
-	})
+	tests := []struct {
+		name           string
+		input          MarkFavoriteLocationInput
+		spaceType      int
+		reservableUUID string
+		inventoryName  string
+	}{
+		{
+			name: "desk",
+			input: MarkFavoriteLocationInput{
+				LocationID:    "5281345f-94bd-4ad0-83e0-472c6829fb72",
+				SpaceType:     0,
+				InventoryName: "1 Mark Sq",
+			},
+			spaceType:     0,
+			inventoryName: "1 Mark Sq",
+		},
+		{
+			name: "private office",
+			input: MarkFavoriteLocationInput{
+				LocationID:     "dbccfd91-4873-40e3-a9b9-89b7a7b68549",
+				SpaceType:      1,
+				ReservableUUID: "dc454f19-33c8-4e3a-b149-6269a8314749",
+				InventoryName:  "06B113",
+			},
+			spaceType:      1,
+			reservableUUID: "dc454f19-33c8-4e3a-b149-6269a8314749",
+			inventoryName:  "06B113",
+		},
+		{
+			name: "room",
+			input: MarkFavoriteLocationInput{
+				LocationID:     "dbccfd91-4873-40e3-a9b9-89b7a7b68549",
+				SpaceType:      2,
+				ReservableUUID: "1222573b-2d84-4633-916f-7b6027e7e48d",
+				InventoryName:  "5A",
+			},
+			spaceType:      2,
+			reservableUUID: "1222573b-2d84-4633-916f-7b6027e7e48d",
+			inventoryName:  "5A",
+		},
+	}
 
-	if request.LocationID != "location-uuid" {
-		t.Fatalf("unexpected LocationID: %s", request.LocationID)
-	}
-	if request.SpaceType != 1 {
-		t.Fatalf("unexpected SpaceType: %d", request.SpaceType)
-	}
-	if request.LocationType != 2 {
-		t.Fatalf("unexpected LocationType: %d", request.LocationType)
-	}
-	if request.LocationAccountType != 2 {
-		t.Fatalf("unexpected LocationAccountType: %d", request.LocationAccountType)
-	}
-	if request.PlatformType != "WEB" {
-		t.Fatalf("unexpected PlatformType: %s", request.PlatformType)
-	}
-	if request.ApplicationType != "WorkplaceOne" {
-		t.Fatalf("unexpected ApplicationType: %s", request.ApplicationType)
-	}
-	if request.ReservableUUID != "reservable-uuid" {
-		t.Fatalf("unexpected ReservableUUID: %s", request.ReservableUUID)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			request := buildMarkFavoriteLocationRequest(tc.input)
+
+			if request.LocationID != tc.input.LocationID {
+				t.Fatalf("unexpected LocationID: %s", request.LocationID)
+			}
+			if request.SpaceType != tc.spaceType {
+				t.Fatalf("unexpected SpaceType: %d", request.SpaceType)
+			}
+			if request.LocationType != 2 {
+				t.Fatalf("unexpected LocationType: %d", request.LocationType)
+			}
+			if request.LocationAccountType != 2 {
+				t.Fatalf("unexpected LocationAccountType: %d", request.LocationAccountType)
+			}
+			if request.PlatformType != "WEB" {
+				t.Fatalf("unexpected PlatformType: %s", request.PlatformType)
+			}
+			if request.ApplicationType != "WorkplaceOne" {
+				t.Fatalf("unexpected ApplicationType: %s", request.ApplicationType)
+			}
+			if request.ReservableUUID != tc.reservableUUID {
+				t.Fatalf("unexpected ReservableUUID: %s", request.ReservableUUID)
+			}
+			if request.InventoryName != tc.inventoryName {
+				t.Fatalf("unexpected InventoryName: %s", request.InventoryName)
+			}
+		})
 	}
 }
