@@ -2,10 +2,12 @@ package wework
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -79,10 +81,6 @@ func extractUUIDFromToken(token string) string {
 	return ""
 }
 
-func escapeQuotes(value string) string {
-	return strings.NewReplacer("\\", "\\\\", `"`, "\\\"").Replace(value)
-}
-
 func (w *WeWork) doRequest(method, url string, data any) (*http.Response, error) {
 	var body []byte
 	var err error
@@ -130,8 +128,8 @@ func (w *WeWork) doRequest(method, url string, data any) (*http.Response, error)
 	return resp, nil
 }
 
-func (w *WeWork) doPrintHubRequest(method, requestURL string, body io.Reader, contentType string) (*http.Response, error) {
-	req, err := http.NewRequest(method, requestURL, body)
+func (w *WeWork) doPrintHubRequest(ctx context.Context, method, requestURL string, body io.Reader, contentType string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, requestURL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
@@ -148,16 +146,16 @@ func (w *WeWork) doPrintHubRequest(method, requestURL string, body io.Reader, co
 		return nil, fmt.Errorf("request failed: %v", err)
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		defer resp.Body.Close()
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
+		resp.Body.Close()
 		return nil, fmt.Errorf("request failed with status code: %d: %s", resp.StatusCode, clipBody(buf.Bytes()))
 	}
 
 	return resp, nil
 }
 
-func (w *WeWork) GetPrintQueue(jobIDs string) (*PrintQueueResponse, error) {
+func (w *WeWork) GetPrintQueue(ctx context.Context, jobIDs string) (*PrintQueueResponse, error) {
 	jobIDs = strings.TrimSpace(jobIDs)
 	if jobIDs == "" {
 		jobIDs = "0"
@@ -167,7 +165,7 @@ func (w *WeWork) GetPrintQueue(jobIDs string) (*PrintQueueResponse, error) {
 	params.Add("jobIds", jobIDs)
 
 	requestURL := "https://members.wework.com/workplaceone/api/wework-yardi/print-hub/get-print-queue?" + params.Encode()
-	resp, err := w.doPrintHubRequest(http.MethodGet, requestURL, nil, "")
+	resp, err := w.doPrintHubRequest(ctx, http.MethodGet, requestURL, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +179,7 @@ func (w *WeWork) GetPrintQueue(jobIDs string) (*PrintQueueResponse, error) {
 	return &result, nil
 }
 
-func (w *WeWork) AddToPrintQueue(input AddPrintJobRequest) (*PrintJob, error) {
+func (w *WeWork) AddToPrintQueue(ctx context.Context, input AddPrintJobRequest) (*PrintJob, error) {
 	if len(input.FileBytes) == 0 {
 		return nil, fmt.Errorf("file bytes are required")
 	}
@@ -227,7 +225,11 @@ func (w *WeWork) AddToPrintQueue(input AddPrintJobRequest) (*PrintJob, error) {
 	}
 
 	fileHeader := make(textproto.MIMEHeader)
-	fileHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, escapeQuotes(input.FileName)))
+	disposition := mime.FormatMediaType("form-data", map[string]string{
+		"name":     "file",
+		"filename": input.FileName,
+	})
+	fileHeader.Set("Content-Disposition", disposition)
 	fileHeader.Set("Content-Type", input.FileContentType)
 	fileWriter, err := writer.CreatePart(fileHeader)
 	if err != nil {
@@ -241,7 +243,7 @@ func (w *WeWork) AddToPrintQueue(input AddPrintJobRequest) (*PrintJob, error) {
 	}
 
 	requestURL := "https://members.wework.com/workplaceone/api/wework-yardi/print-hub/add-to-print-queue"
-	resp, err := w.doPrintHubRequest(http.MethodPost, requestURL, &body, writer.FormDataContentType())
+	resp, err := w.doPrintHubRequest(ctx, http.MethodPost, requestURL, &body, writer.FormDataContentType())
 	if err != nil {
 		return nil, err
 	}

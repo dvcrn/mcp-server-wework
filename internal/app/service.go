@@ -22,6 +22,8 @@ const (
 	platformWeb = 1
 	platformIOS = 2
 
+	maxPrintFileSize = 50 * 1024 * 1024
+
 	cancelBookingTypeConferenceRoom = 0
 	cancelBookingTypePrivateOffice  = 2
 	cancelBookingTypeSharedDesk     = 4
@@ -599,19 +601,28 @@ func (s *Service) CancelBooking(ctx context.Context, input CancelBookingInput) (
 }
 
 func (s *Service) PrintQueue(ctx context.Context, input PrintQueueInput) (*wework.PrintQueueResponse, error) {
-	_ = ctx
 	ww, err := s.clientForRequest()
 	if err != nil {
 		return nil, err
 	}
-	return ww.GetPrintQueue(input.JobIDs)
+	return ww.GetPrintQueue(ctx, input.JobIDs)
 }
 
 func (s *Service) AddPrintJob(ctx context.Context, input AddPrintJobInput) (AddPrintJobOutput, error) {
-	_ = ctx
 	filePath := strings.TrimSpace(input.FilePath)
 	if filePath == "" {
 		return AddPrintJobOutput{}, fmt.Errorf("file_path is required")
+	}
+
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return AddPrintJobOutput{}, fmt.Errorf("failed to stat file_path: %w", err)
+	}
+	if fileInfo.IsDir() {
+		return AddPrintJobOutput{}, fmt.Errorf("file_path is a directory")
+	}
+	if fileInfo.Size() > maxPrintFileSize {
+		return AddPrintJobOutput{}, fmt.Errorf("file size exceeds the 50MB limit")
 	}
 
 	fileBytes, err := os.ReadFile(filePath)
@@ -638,7 +649,7 @@ func (s *Service) AddPrintJob(ctx context.Context, input AddPrintJobInput) (AddP
 		jobName = fileName
 	}
 
-	job, err := ww.AddToPrintQueue(wework.AddPrintJobRequest{
+	job, err := ww.AddToPrintQueue(ctx, wework.AddPrintJobRequest{
 		Copies:               input.Copies,
 		ForceMediaSize:       input.ForceMediaSize,
 		OrientationRequested: input.OrientationRequested,

@@ -1,6 +1,7 @@
 package wework
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"mime"
@@ -236,7 +237,7 @@ func TestGetPrintQueueBuildsPrintHubRequest(t *testing.T) {
 		return jsonResponse(http.StatusOK, `{"content":[],"page":{"totalElements":0}}`), nil
 	})
 
-	result, err := ww.GetPrintQueue("")
+	result, err := ww.GetPrintQueue(context.Background(), "")
 	if err != nil {
 		t.Fatalf("GetPrintQueue returned error: %v", err)
 	}
@@ -313,7 +314,7 @@ func TestAddToPrintQueueBuildsMultipartRequest(t *testing.T) {
 		return jsonResponse(http.StatusOK, `{"id":"job-123","status":"RECEIVED","jobName":"test-job.pdf","copies":2,"printColorMode":"color","sides":"two-sided-long-edge"}`), nil
 	})
 
-	job, err := ww.AddToPrintQueue(AddPrintJobRequest{
+	job, err := ww.AddToPrintQueue(context.Background(), AddPrintJobRequest{
 		Copies:               2,
 		ForceMediaSize:       "iso_a4_210x297mm",
 		OrientationRequested: "landscape",
