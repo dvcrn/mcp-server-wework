@@ -183,8 +183,8 @@ func (w *WeWork) GetFavoriteLocations(spaceType int) (*FavoriteLocationsResponse
 	params.Add("requestType", "1")
 	params.Add("spaceType", strconv.Itoa(spaceType))
 
-	url := "https://members.wework.com/workplaceone/api/recent-and-favorite/v2/get-recents-and-favorite-location-data?" + params.Encode()
-	resp, err := w.doRequest(http.MethodGet, url, nil)
+	apiURL := "https://members.wework.com/workplaceone/api/recent-and-favorite/v2/get-recents-and-favorite-location-data?" + params.Encode()
+	resp, err := w.doRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -199,8 +199,8 @@ func (w *WeWork) GetFavoriteLocations(spaceType int) (*FavoriteLocationsResponse
 }
 
 func (w *WeWork) MarkFavoriteLocation(request MarkFavoriteLocationRequest) (map[string]any, error) {
-	url := "https://members.wework.com/workplaceone/api/recent-and-favorite/mark-as-favorite-location"
-	resp, err := w.doRequest(http.MethodPost, url, request)
+	apiURL := "https://members.wework.com/workplaceone/api/recent-and-favorite/mark-as-favorite-location"
+	resp, err := w.doRequest(http.MethodPost, apiURL, request)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (w *WeWork) MarkFavoriteLocation(request MarkFavoriteLocationRequest) (map[
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
-	if len(strings.TrimSpace(string(body))) == 0 {
+	if len(bytes.TrimSpace(body)) == 0 {
 		return map[string]any{"ok": true}, nil
 	}
 

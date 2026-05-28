@@ -86,12 +86,16 @@ func TestBuildCancelRequest(t *testing.T) {
 }
 
 func TestBuildMarkFavoriteLocationRequestDefaults(t *testing.T) {
+	locationTypeZero := 0
+	locationAccountTypeZero := 0
 	tests := []struct {
-		name           string
-		input          MarkFavoriteLocationInput
-		spaceType      int
-		reservableUUID string
-		inventoryName  string
+		name                string
+		input               MarkFavoriteLocationInput
+		spaceType           int
+		locationType        int
+		locationAccountType int
+		reservableUUID      string
+		inventoryName       string
 	}{
 		{
 			name: "desk",
@@ -100,8 +104,10 @@ func TestBuildMarkFavoriteLocationRequestDefaults(t *testing.T) {
 				SpaceType:     0,
 				InventoryName: "1 Mark Sq",
 			},
-			spaceType:     0,
-			inventoryName: "1 Mark Sq",
+			spaceType:           0,
+			locationType:        2,
+			locationAccountType: 2,
+			inventoryName:       "1 Mark Sq",
 		},
 		{
 			name: "private office",
@@ -111,9 +117,11 @@ func TestBuildMarkFavoriteLocationRequestDefaults(t *testing.T) {
 				ReservableUUID: "dc454f19-33c8-4e3a-b149-6269a8314749",
 				InventoryName:  "06B113",
 			},
-			spaceType:      1,
-			reservableUUID: "dc454f19-33c8-4e3a-b149-6269a8314749",
-			inventoryName:  "06B113",
+			spaceType:           1,
+			locationType:        2,
+			locationAccountType: 2,
+			reservableUUID:      "dc454f19-33c8-4e3a-b149-6269a8314749",
+			inventoryName:       "06B113",
 		},
 		{
 			name: "room",
@@ -123,9 +131,25 @@ func TestBuildMarkFavoriteLocationRequestDefaults(t *testing.T) {
 				ReservableUUID: "1222573b-2d84-4633-916f-7b6027e7e48d",
 				InventoryName:  "5A",
 			},
-			spaceType:      2,
-			reservableUUID: "1222573b-2d84-4633-916f-7b6027e7e48d",
-			inventoryName:  "5A",
+			spaceType:           2,
+			locationType:        2,
+			locationAccountType: 2,
+			reservableUUID:      "1222573b-2d84-4633-916f-7b6027e7e48d",
+			inventoryName:       "5A",
+		},
+		{
+			name: "explicit zero location types",
+			input: MarkFavoriteLocationInput{
+				LocationID:          "dbccfd91-4873-40e3-a9b9-89b7a7b68549",
+				SpaceType:           0,
+				LocationType:        &locationTypeZero,
+				LocationAccountType: &locationAccountTypeZero,
+				InventoryName:       "Bangkok",
+			},
+			spaceType:           0,
+			locationType:        0,
+			locationAccountType: 0,
+			inventoryName:       "Bangkok",
 		},
 	}
 
@@ -139,10 +163,10 @@ func TestBuildMarkFavoriteLocationRequestDefaults(t *testing.T) {
 			if request.SpaceType != tc.spaceType {
 				t.Fatalf("unexpected SpaceType: %d", request.SpaceType)
 			}
-			if request.LocationType != 2 {
+			if request.LocationType != tc.locationType {
 				t.Fatalf("unexpected LocationType: %d", request.LocationType)
 			}
-			if request.LocationAccountType != 2 {
+			if request.LocationAccountType != tc.locationAccountType {
 				t.Fatalf("unexpected LocationAccountType: %d", request.LocationAccountType)
 			}
 			if request.PlatformType != "WEB" {

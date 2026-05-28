@@ -73,22 +73,21 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func firstNonZero(values ...int) int {
-	for _, value := range values {
-		if value != 0 {
-			return value
-		}
-	}
-	return 0
-}
-
 func buildMarkFavoriteLocationRequest(input MarkFavoriteLocationInput) wework.MarkFavoriteLocationRequest {
+	locationType := 2
+	if input.LocationType != nil {
+		locationType = *input.LocationType
+	}
+	locationAccountType := 2
+	if input.LocationAccountType != nil {
+		locationAccountType = *input.LocationAccountType
+	}
 	return wework.MarkFavoriteLocationRequest{
 		LocationID:          input.LocationID,
 		SpaceType:           input.SpaceType,
 		IsDeleted:           input.IsDeleted,
-		LocationType:        firstNonZero(input.LocationType, 2),
-		LocationAccountType: firstNonZero(input.LocationAccountType, 2),
+		LocationType:        locationType,
+		LocationAccountType: locationAccountType,
 		ReservableUUID:      input.ReservableUUID,
 		SpaceID:             input.SpaceID,
 		InventoryName:       input.InventoryName,
@@ -117,8 +116,8 @@ type MarkFavoriteLocationInput struct {
 	LocationID          string `json:"location_id"`
 	SpaceType           int    `json:"space_type,omitempty"`
 	IsDeleted           bool   `json:"is_deleted,omitempty"`
-	LocationType        int    `json:"location_type,omitempty"`
-	LocationAccountType int    `json:"location_account_type,omitempty"`
+	LocationType        *int   `json:"location_type,omitempty"`
+	LocationAccountType *int   `json:"location_account_type,omitempty"`
 	ReservableUUID      string `json:"reservable_uuid,omitempty"`
 	SpaceID             int    `json:"space_id,omitempty"`
 	InventoryName       string `json:"inventory_name,omitempty"`
