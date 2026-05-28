@@ -82,13 +82,29 @@ func main() {
 
 	server.AddTool(mcp.Tool{
 		Name:        "book",
-		Description: "Book a workspace for one date, a comma-separated list of dates, or a date range like YYYY-MM-DD~YYYY-MM-DD.",
+		Description: "Book a workspace for one date, a comma-separated list of dates, a date range like YYYY-MM-DD~YYYY-MM-DD, or with a direct WeWork booking payload.",
 		InputSchema: objSchema(map[string]any{
 			"location_uuid": strSchema("Location UUID to book."),
 			"city":          strSchema("City name used together with name when location_uuid is omitted."),
 			"name":          strSchema("Location name used together with city when location_uuid is omitted."),
 			"date":          strSchema("A single date, comma-separated dates, or a range like 2026-04-06~2026-04-08."),
-		}, "date"),
+
+			"StartTime":            strSchema("Direct booking payload StartTime as a UTC ISO datetime string."),
+			"EndTime":              strSchema("Direct booking payload EndTime as a UTC ISO datetime string."),
+			"LocationID":           strSchema("Direct booking payload LocationID."),
+			"WeWorkSpaceID":        strSchema("Direct booking payload WeWorkSpaceID."),
+			"SpaceID":              strSchema("Direct booking payload SpaceID."),
+			"ApplicationType":      strSchema("Direct booking payload ApplicationType."),
+			"LocationType":         intSchema("Direct booking payload LocationType."),
+			"PlatFormTypeEnum":     intSchema("Direct booking payload PlatFormTypeEnum."),
+			"PlatformType":         strSchema("Direct booking payload PlatformType."),
+			"SpaceType":            intSchema("Direct booking payload SpaceType."),
+			"SpaceTypeID":          intSchema("Direct booking payload SpaceTypeID."),
+			"UTCOffset":            strSchema("Direct booking payload UTCOffset."),
+			"TriggerCalendarEvent": boolSchema("Direct booking payload TriggerCalendarEvent."),
+			"CreditCharged":        numberSchema("Direct booking payload CreditCharged."),
+			"Currency":             strSchema("Direct booking payload Currency."),
+		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var input app.BookInput
 			if err := decode(raw, &input); err != nil {
@@ -222,4 +238,8 @@ func boolSchema(description string) map[string]any {
 
 func intSchema(description string) map[string]any {
 	return map[string]any{"type": "integer", "description": description}
+}
+
+func numberSchema(description string) map[string]any {
+	return map[string]any{"type": "number", "description": description}
 }

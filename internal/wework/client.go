@@ -28,6 +28,14 @@ type QuoteParameters struct {
 	SpaceID      string
 }
 
+type bookingTimeRange struct {
+	DateInTz string
+	Open     string
+	Close    string
+	StartUTC string
+	EndUTC   string
+}
+
 func NewWeWork(token string) *WeWork {
 	client, err := NewBaseClient()
 	if err != nil {
@@ -421,6 +429,22 @@ func (w *WeWork) PostBooking(date time.Time, space *Workspace) (*BookingResponse
 	return w.createBooking(date, space, quote)
 }
 
+func (w *WeWork) PostBookingPayload(payload map[string]any) (*BookingResponse, error) {
+	bookingURL := "https://members.wework.com/workplaceone/api/common-booking/"
+	bookingResp, err := w.doRequest(http.MethodPost, bookingURL, payload)
+	if err != nil {
+		return nil, err
+	}
+	defer bookingResp.Body.Close()
+
+	var result BookingResponse
+	if err := json.NewDecoder(bookingResp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode booking response: %v", err)
+	}
+
+	return &result, nil
+}
+
 // GetBookingQuote returns the booking quote for a given workspace and date, without creating a booking.
 func (w *WeWork) GetBookingQuote(date time.Time, space *Workspace) (*QuoteResponse, error) {
 	return w.getBookingQuote(date, space)
@@ -483,30 +507,86 @@ func getBookingSpaceID(space *Workspace) string {
 	}
 }
 
-func (w *WeWork) getBookingQuote(date time.Time, space *Workspace) (*QuoteResponse, error) {
+func buildBookingTimeRange(date time.Time, space *Workspace) (bookingTimeRange, error) {
 	loc, err := time.LoadLocation(space.Location.TimeZone)
 	if err != nil {
-		return nil, err
+		return bookingTimeRange{}, err
 	}
 
 	dateInTz := date.In(loc)
-	// Parse open and close times (e.g., "08:30" and "20:00")
-	openHour, openMin := 8, 30 // Default values
-	if len(space.OpenTime) >= 5 {
-		fmt.Sscanf(space.OpenTime, "%d:%d", &openHour, &openMin)
-	}
-	closeHour, closeMin := 20, 0 // Default values
-	if len(space.CloseTime) >= 5 {
-		fmt.Sscanf(space.CloseTime, "%d:%d", &closeHour, &closeMin)
+	open := firstTimeString(space.OpenTime, "08:30")
+	close := firstTimeString(space.CloseTime, "20:00")
+	if hours := operatingHoursForDate(dateInTz, space.OperatingHours); hours != nil && !hours.IsClosed {
+		open = firstTimeString(hours.Open, open)
+		close = firstTimeString(hours.Close, close)
 	}
 
-	// Create start and end times in local timezone
-	startLocal := time.Date(dateInTz.Year(), dateInTz.Month(), dateInTz.Day(), openHour, openMin, 0, 0, loc)
-	endLocal := time.Date(dateInTz.Year(), dateInTz.Month(), dateInTz.Day(), closeHour, closeMin, 0, 0, loc)
+	startLocal, startOK := localTimeForDate(dateInTz, loc, open)
+	endLocal, endOK := localTimeForDate(dateInTz, loc, close)
+	if !startOK || !endOK || !endLocal.After(startLocal) {
+		open = "06:00"
+		close = "23:59"
+		startLocal, _ = localTimeForDate(dateInTz, loc, open)
+		endLocal, _ = localTimeForDate(dateInTz, loc, close)
+	}
 
-	// Convert to UTC
-	startTime := startLocal.UTC().Format("2006-01-02T15:04:05Z")
-	endTime := endLocal.UTC().Format("2006-01-02T15:04:05Z")
+	return bookingTimeRange{
+		DateInTz: dateInTz.Format("2006-01-02"),
+		Open:     open,
+		Close:    close,
+		StartUTC: startLocal.UTC().Format("2006-01-02T15:04:05Z"),
+		EndUTC:   endLocal.UTC().Format("2006-01-02T15:04:05Z"),
+	}, nil
+}
+
+func firstTimeString(value, fallback string) string {
+	value = strings.TrimSpace(value)
+	if len(value) >= 5 {
+		return value[:5]
+	}
+	return fallback
+}
+
+func localTimeForDate(date time.Time, loc *time.Location, value string) (time.Time, bool) {
+	var hour, minute int
+	if _, err := fmt.Sscanf(value, "%d:%d", &hour, &minute); err != nil {
+		return time.Time{}, false
+	}
+	if hour < 0 || hour > 23 || minute < 0 || minute > 59 {
+		return time.Time{}, false
+	}
+	return time.Date(date.Year(), date.Month(), date.Day(), hour, minute, 0, 0, loc), true
+}
+
+func operatingHoursForDate(date time.Time, hours []*OperatingHours) *OperatingHours {
+	weekday := date.Weekday()
+	dayName := strings.ToLower(weekday.String())
+	for _, item := range hours {
+		if item == nil {
+			continue
+		}
+		if strings.EqualFold(item.Day, dayName) {
+			return item
+		}
+		if item.DayOfWeek == int(weekday) || item.DayOfWeek == isoDayOfWeek(weekday) {
+			return item
+		}
+	}
+	return nil
+}
+
+func isoDayOfWeek(weekday time.Weekday) int {
+	if weekday == time.Sunday {
+		return 7
+	}
+	return int(weekday)
+}
+
+func (w *WeWork) getBookingQuote(date time.Time, space *Workspace) (*QuoteResponse, error) {
+	times, err := buildBookingTimeRange(date, space)
+	if err != nil {
+		return nil, err
+	}
 
 	quoteURL := "https://members.wework.com/workplaceone/api/common-booking/quote"
 	params, err := getQuoteParameters(space)
@@ -516,21 +596,22 @@ func (w *WeWork) getBookingQuote(date time.Time, space *Workspace) (*QuoteRespon
 
 	quoteData := map[string]any{
 		"SpaceType":            4,
+		"SpaceTypeID":          0,
 		"ReservationID":        "",
 		"TriggerCalendarEvent": true,
 		"Notes":                nil,
 		"MailData": map[string]any{
-			"dayFormatted":       dateInTz.Format("Monday, January 2nd"),
-			"startTimeFormatted": fmt.Sprintf("%s AM", space.OpenTime),
-			"endTimeFormatted":   fmt.Sprintf("%s PM", space.CloseTime),
+			"dayFormatted":       times.DateInTz,
+			"startTimeFormatted": times.Open,
+			"endTimeFormatted":   times.Close,
 			"floorAddress":       "",
 			"locationAddress":    space.Location.Address.Line1,
 			"creditsUsed":        "2",
 			"Capacity":           "1",
 			"TimezoneUsed":       fmt.Sprintf("GMT %s", space.Location.TimezoneOffset),
 			"TimezoneIana":       space.Location.TimeZone,
-			"startDateTime":      fmt.Sprintf("%s %s", dateInTz.Format("2006-01-02"), space.OpenTime),
-			"endDateTime":        fmt.Sprintf("%s %s", dateInTz.Format("2006-01-02"), space.CloseTime),
+			"startDateTime":      fmt.Sprintf("%s %s", times.DateInTz, times.Open),
+			"endDateTime":        fmt.Sprintf("%s %s", times.DateInTz, times.Close),
 			"locationName":       space.Location.Name,
 			"locationCity":       space.Location.Address.City,
 			"locationCountry":    space.Location.Address.Country,
@@ -542,8 +623,8 @@ func (w *WeWork) getBookingQuote(date time.Time, space *Workspace) (*QuoteRespon
 		"LocationID":    space.Location.UUID,
 		"SpaceID":       params.SpaceID,
 		"WeWorkSpaceID": space.UUID,
-		"StartTime":     startTime,
-		"EndTime":       endTime,
+		"StartTime":     times.StartUTC,
+		"EndTime":       times.EndUTC,
 	}
 
 	quoteResp, err := w.doRequest(http.MethodPost, quoteURL, quoteData)
@@ -561,35 +642,9 @@ func (w *WeWork) getBookingQuote(date time.Time, space *Workspace) (*QuoteRespon
 }
 
 func (w *WeWork) createBooking(date time.Time, space *Workspace, quote *QuoteResponse) (*BookingResponse, error) {
-	loc, err := time.LoadLocation(space.Location.TimeZone)
+	times, err := buildBookingTimeRange(date, space)
 	if err != nil {
 		return nil, err
-	}
-
-	dateInTz := date.In(loc)
-	// Parse open and close times (e.g., "08:30" and "20:00")
-	openHour, openMin := 8, 30 // Default values
-	if len(space.OpenTime) >= 5 {
-		fmt.Sscanf(space.OpenTime, "%d:%d", &openHour, &openMin)
-	}
-	closeHour, closeMin := 20, 0 // Default values
-	if len(space.CloseTime) >= 5 {
-		fmt.Sscanf(space.CloseTime, "%d:%d", &closeHour, &closeMin)
-	}
-
-	// Create start and end times in local timezone
-	startLocal := time.Date(dateInTz.Year(), dateInTz.Month(), dateInTz.Day(), openHour, openMin, 0, 0, loc)
-	endLocal := time.Date(dateInTz.Year(), dateInTz.Month(), dateInTz.Day(), closeHour, closeMin, 0, 0, loc)
-
-	// Convert to UTC
-	startTime := startLocal.UTC().Format("2006-01-02T15:04:05Z")
-	endTime := endLocal.UTC().Format("2006-01-02T15:04:05Z")
-
-	// Note: Removing the date adjustment logic that was causing "already booked" errors
-	// The API should handle far-future dates appropriately
-	if daysUntilBooking := time.Until(dateInTz); daysUntilBooking > 30*24*time.Hour {
-		// Don't print here - let the caller handle the warning
-		// The original date adjustment was causing issues by trying to book past dates
 	}
 
 	// Use LocationType-specific logic for booking SpaceID
@@ -599,22 +654,24 @@ func (w *WeWork) createBooking(date time.Time, space *Workspace, quote *QuoteRes
 	bookingData := map[string]any{
 		"ApplicationType":      "WorkplaceOne",
 		"PlatformType":         "iOS_APP",
+		"PlatFormTypeEnum":     1,
 		"SpaceType":            4,
+		"SpaceTypeID":          0,
 		"ReservationID":        "",
 		"TriggerCalendarEvent": true,
 		"Notes":                nil,
 		"MailData": map[string]any{
-			"dayFormatted":       dateInTz.Format("Monday, January 2nd"),
-			"startTimeFormatted": fmt.Sprintf("%s AM", space.OpenTime),
-			"endTimeFormatted":   fmt.Sprintf("%s PM", space.CloseTime),
+			"dayFormatted":       times.DateInTz,
+			"startTimeFormatted": times.Open,
+			"endTimeFormatted":   times.Close,
 			"floorAddress":       "",
 			"locationAddress":    space.Location.Address.Line1,
 			"creditsUsed":        "0",
 			"Capacity":           "1",
 			"TimezoneUsed":       fmt.Sprintf("GMT %s", space.Location.TimezoneOffset),
 			"TimezoneIana":       space.Location.TimeZone,
-			"startDateTime":      fmt.Sprintf("%s %s", dateInTz.Format("2006-01-02"), space.OpenTime),
-			"endDateTime":        fmt.Sprintf("%s %s", dateInTz.Format("2006-01-02"), space.CloseTime),
+			"startDateTime":      fmt.Sprintf("%s %s", times.DateInTz, times.Open),
+			"endDateTime":        fmt.Sprintf("%s %s", times.DateInTz, times.Close),
 			"locationName":       space.Location.Name,
 			"locationCity":       space.Location.Address.City,
 			"locationCountry":    space.Location.Address.Country,
@@ -624,11 +681,12 @@ func (w *WeWork) createBooking(date time.Time, space *Workspace, quote *QuoteRes
 		"UTCOffset":     space.Location.TimezoneOffset,
 		"Currency":      "com.wework.credits", // Currency field is required
 		"CreditRatio":   quote.GrandTotal.CreditRatio,
+		"CreditCharged": 0,
 		"LocationID":    space.Location.UUID,
 		"SpaceID":       bookingSpaceID, // Use LocationType-specific SpaceID
 		"WeWorkSpaceID": space.UUID,
-		"StartTime":     startTime,
-		"EndTime":       endTime,
+		"StartTime":     times.StartUTC,
+		"EndTime":       times.EndUTC,
 	}
 
 	bookingResp, err := w.doRequest(http.MethodPost, bookingURL, bookingData)

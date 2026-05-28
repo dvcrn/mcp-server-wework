@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -94,6 +95,22 @@ type BookInput struct {
 	City         string `json:"city,omitempty"`
 	Name         string `json:"name,omitempty"`
 	Date         string `json:"date"`
+
+	StartTime            string           `json:"StartTime,omitempty"`
+	EndTime              string           `json:"EndTime,omitempty"`
+	LocationID           string           `json:"LocationID,omitempty"`
+	WeWorkSpaceID        string           `json:"WeWorkSpaceID,omitempty"`
+	SpaceID              string           `json:"SpaceID,omitempty"`
+	SpaceType            *int             `json:"SpaceType,omitempty"`
+	SpaceTypeID          *int             `json:"SpaceTypeID,omitempty"`
+	LocationType         *int             `json:"LocationType,omitempty"`
+	ApplicationType      string           `json:"ApplicationType,omitempty"`
+	PlatformType         string           `json:"PlatformType,omitempty"`
+	PlatFormTypeEnum     *int             `json:"PlatFormTypeEnum,omitempty"`
+	UTCOffset            string           `json:"UTCOffset,omitempty"`
+	TriggerCalendarEvent *bool            `json:"TriggerCalendarEvent,omitempty"`
+	CreditCharged        *json.RawMessage `json:"CreditCharged,omitempty"`
+	Currency             string           `json:"Currency,omitempty"`
 }
 
 type QuoteInput struct {
@@ -317,6 +334,10 @@ func (s *Service) Book(ctx context.Context, input BookInput) (BookResults, error
 		return BookResults{}, err
 	}
 
+	if input.hasDirectBookingPayload() {
+		return s.bookDirect(ww, input)
+	}
+
 	targetLocationUUID, err := resolveLocationUUID(ww, input.City, input.Name, input.LocationUUID)
 	if err != nil {
 		return BookResults{}, err
@@ -363,6 +384,102 @@ func (s *Service) Book(ctx context.Context, input BookInput) (BookResults, error
 	}
 
 	return BookResults{Items: results}, nil
+}
+
+func (s *Service) bookDirect(ww *wework.WeWork, input BookInput) (BookResults, error) {
+	if strings.TrimSpace(input.StartTime) == "" {
+		return BookResults{}, fmt.Errorf("StartTime is required when using direct booking parameters")
+	}
+	if strings.TrimSpace(input.EndTime) == "" {
+		return BookResults{}, fmt.Errorf("EndTime is required when using direct booking parameters")
+	}
+
+	payload := directBookingPayload(input)
+	result := BookResult{
+		Date:         directBookingDate(input),
+		SpaceUUID:    input.WeWorkSpaceID,
+		LocationUUID: firstNonEmpty(input.LocationID, input.LocationUUID),
+	}
+
+	bookRes, err := ww.PostBookingPayload(payload)
+	if err != nil {
+		result.Error = fmt.Sprintf("booking failed: %v", err)
+	} else {
+		result.BookingStatus = bookRes
+	}
+
+	return BookResults{Items: []BookResult{result}}, nil
+}
+
+func (input BookInput) hasDirectBookingPayload() bool {
+	return input.StartTime != "" ||
+		input.EndTime != "" ||
+		input.LocationID != "" ||
+		input.WeWorkSpaceID != "" ||
+		input.SpaceID != "" ||
+		input.SpaceType != nil ||
+		input.SpaceTypeID != nil ||
+		input.LocationType != nil ||
+		input.ApplicationType != "" ||
+		input.PlatformType != "" ||
+		input.PlatFormTypeEnum != nil ||
+		input.UTCOffset != "" ||
+		input.TriggerCalendarEvent != nil ||
+		input.CreditCharged != nil ||
+		input.Currency != ""
+}
+
+func directBookingPayload(input BookInput) map[string]any {
+	payload := map[string]any{}
+
+	addString := func(key, value string) {
+		if value != "" {
+			payload[key] = value
+		}
+	}
+	addInt := func(key string, value *int) {
+		if value != nil {
+			payload[key] = *value
+		}
+	}
+
+	addString("StartTime", input.StartTime)
+	addString("EndTime", input.EndTime)
+	addString("LocationID", firstNonEmpty(input.LocationID, input.LocationUUID))
+	addString("WeWorkSpaceID", input.WeWorkSpaceID)
+	addString("SpaceID", input.SpaceID)
+	addInt("SpaceType", input.SpaceType)
+	addInt("SpaceTypeID", input.SpaceTypeID)
+	addInt("LocationType", input.LocationType)
+	addString("ApplicationType", input.ApplicationType)
+	addString("PlatformType", input.PlatformType)
+	addInt("PlatFormTypeEnum", input.PlatFormTypeEnum)
+	addString("UTCOffset", input.UTCOffset)
+	if input.TriggerCalendarEvent != nil {
+		payload["TriggerCalendarEvent"] = *input.TriggerCalendarEvent
+	}
+	if input.CreditCharged != nil {
+		var value any
+		if err := json.Unmarshal(*input.CreditCharged, &value); err == nil {
+			payload["CreditCharged"] = value
+		}
+	}
+	addString("Currency", input.Currency)
+
+	return payload
+}
+
+func directBookingDate(input BookInput) string {
+	if strings.TrimSpace(input.Date) != "" {
+		return input.Date
+	}
+	if t, err := time.Parse(time.RFC3339, input.StartTime); err == nil {
+		return t.Format("2006-01-02")
+	}
+	if len(input.StartTime) >= len("2006-01-02") {
+		return input.StartTime[:len("2006-01-02")]
+	}
+	return ""
 }
 
 func (s *Service) Quote(ctx context.Context, input QuoteInput) (QuoteResults, error) {

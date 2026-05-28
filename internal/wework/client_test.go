@@ -3,6 +3,7 @@ package wework
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestGetQuoteParameters(t *testing.T) {
@@ -97,6 +98,82 @@ func TestGetQuoteParameters(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBuildBookingTimeRangeFallsBackWhenAvailabilityTimesAreEqual(t *testing.T) {
+	space := &Workspace{
+		OpenTime:  "00:00",
+		CloseTime: "00:00",
+		Location: Location{
+			TimeZone: "Europe/London",
+		},
+	}
+
+	times, err := buildBookingTimeRange(time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC), space)
+	if err != nil {
+		t.Fatalf("buildBookingTimeRange returned error: %v", err)
+	}
+
+	if times.Open != "06:00" {
+		t.Fatalf("unexpected open time: %s", times.Open)
+	}
+	if times.Close != "23:59" {
+		t.Fatalf("unexpected close time: %s", times.Close)
+	}
+	if times.StartUTC != "2026-05-31T05:00:00Z" {
+		t.Fatalf("unexpected StartUTC: %s", times.StartUTC)
+	}
+	if times.EndUTC != "2026-05-31T22:59:00Z" {
+		t.Fatalf("unexpected EndUTC: %s", times.EndUTC)
+	}
+}
+
+func TestBuildBookingTimeRangeUsesOperatingHoursForDate(t *testing.T) {
+	space := &Workspace{
+		OpenTime:  "00:00",
+		CloseTime: "00:00",
+		Location: Location{
+			TimeZone: "Europe/London",
+		},
+		OperatingHours: []*OperatingHours{
+			{Day: "Sunday", Open: "07:15", Close: "18:45"},
+		},
+	}
+
+	times, err := buildBookingTimeRange(time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC), space)
+	if err != nil {
+		t.Fatalf("buildBookingTimeRange returned error: %v", err)
+	}
+
+	if times.Open != "07:15" {
+		t.Fatalf("unexpected open time: %s", times.Open)
+	}
+	if times.Close != "18:45" {
+		t.Fatalf("unexpected close time: %s", times.Close)
+	}
+	if times.StartUTC != "2026-05-31T06:15:00Z" {
+		t.Fatalf("unexpected StartUTC: %s", times.StartUTC)
+	}
+	if times.EndUTC != "2026-05-31T17:45:00Z" {
+		t.Fatalf("unexpected EndUTC: %s", times.EndUTC)
+	}
+}
+
+func TestGetBookingSpaceIDUsesKubeIDForLocationTypeTwo(t *testing.T) {
+	space := &Workspace{
+		UUID:          "space-uuid",
+		InventoryUUID: "inventory-uuid",
+		Location: Location{
+			AccountType: 2,
+		},
+		Reservable: &WorkspaceReservable{
+			KubeId: "15769",
+		},
+	}
+
+	if got := getBookingSpaceID(space); got != "15769" {
+		t.Fatalf("getBookingSpaceID() = %s, want 15769", got)
 	}
 }
 

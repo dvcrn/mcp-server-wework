@@ -180,7 +180,7 @@ type Workspace struct {
 
 type WorkspaceReservable struct {
 	Capacity      int    `json:"capacity"`
-	KubeId        string `json:"KubeId"`
+	KubeId        string `json:"kubeId"`
 	CwmSpaceId    int    `json:"cwmSpaceId"`
 	CwmSpaceCount int    `json:"cwmSpaceCount"`
 }

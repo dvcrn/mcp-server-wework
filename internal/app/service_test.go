@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -40,6 +41,56 @@ func TestParseDateSelection(t *testing.T) {
 			t.Fatalf("unexpected end date: %s", dates[2].Format("2006-01-02"))
 		}
 	})
+}
+
+func TestDirectBookingPayload(t *testing.T) {
+	spaceType := 4
+	spaceTypeID := 0
+	locationType := 2
+	platformType := 1
+	triggerCalendarEvent := true
+	creditCharged := json.RawMessage(`0`)
+
+	input := BookInput{
+		StartTime:            "2026-06-07T05:00:00Z",
+		EndTime:              "2026-06-07T22:59:00Z",
+		LocationID:           "20242b8b-d507-44e4-942e-1d89814bbf38",
+		WeWorkSpaceID:        "519f596a-99d4-11ea-bbbf-0abba6a90f13",
+		SpaceID:              "15769",
+		SpaceType:            &spaceType,
+		SpaceTypeID:          &spaceTypeID,
+		LocationType:         &locationType,
+		ApplicationType:      "WorkplaceOne",
+		PlatFormTypeEnum:     &platformType,
+		UTCOffset:            "+01:00",
+		TriggerCalendarEvent: &triggerCalendarEvent,
+		CreditCharged:        &creditCharged,
+		Currency:             "com.wework.credits",
+	}
+
+	payload := directBookingPayload(input)
+
+	assertPayloadValue(t, payload, "StartTime", "2026-06-07T05:00:00Z")
+	assertPayloadValue(t, payload, "EndTime", "2026-06-07T22:59:00Z")
+	assertPayloadValue(t, payload, "LocationID", "20242b8b-d507-44e4-942e-1d89814bbf38")
+	assertPayloadValue(t, payload, "WeWorkSpaceID", "519f596a-99d4-11ea-bbbf-0abba6a90f13")
+	assertPayloadValue(t, payload, "SpaceID", "15769")
+	assertPayloadValue(t, payload, "SpaceType", 4)
+	assertPayloadValue(t, payload, "SpaceTypeID", 0)
+	assertPayloadValue(t, payload, "LocationType", 2)
+	assertPayloadValue(t, payload, "ApplicationType", "WorkplaceOne")
+	assertPayloadValue(t, payload, "PlatFormTypeEnum", 1)
+	assertPayloadValue(t, payload, "UTCOffset", "+01:00")
+	assertPayloadValue(t, payload, "TriggerCalendarEvent", true)
+	assertPayloadValue(t, payload, "CreditCharged", float64(0))
+	assertPayloadValue(t, payload, "Currency", "com.wework.credits")
+}
+
+func assertPayloadValue(t *testing.T, payload map[string]any, key string, want any) {
+	t.Helper()
+	if got := payload[key]; got != want {
+		t.Fatalf("payload[%s] = %#v, want %#v", key, got, want)
+	}
 }
 
 func TestBuildCancelRequest(t *testing.T) {
