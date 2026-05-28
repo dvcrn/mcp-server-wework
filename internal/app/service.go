@@ -459,10 +459,7 @@ func directBookingPayload(input BookInput) map[string]any {
 		payload["TriggerCalendarEvent"] = *input.TriggerCalendarEvent
 	}
 	if input.CreditCharged != nil {
-		var value any
-		if err := json.Unmarshal(*input.CreditCharged, &value); err == nil {
-			payload["CreditCharged"] = value
-		}
+		payload["CreditCharged"] = *input.CreditCharged
 	}
 	addString("Currency", input.Currency)
 

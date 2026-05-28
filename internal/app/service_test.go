@@ -82,7 +82,13 @@ func TestDirectBookingPayload(t *testing.T) {
 	assertPayloadValue(t, payload, "PlatFormTypeEnum", 1)
 	assertPayloadValue(t, payload, "UTCOffset", "+01:00")
 	assertPayloadValue(t, payload, "TriggerCalendarEvent", true)
-	assertPayloadValue(t, payload, "CreditCharged", float64(0))
+	creditCharged, ok := payload["CreditCharged"].(json.RawMessage)
+	if !ok {
+		t.Fatalf("payload[CreditCharged] = %#v, want json.RawMessage", payload["CreditCharged"])
+	}
+	if string(creditCharged) != "0" {
+		t.Fatalf("payload[CreditCharged] = %s, want 0", string(creditCharged))
+	}
 	assertPayloadValue(t, payload, "Currency", "com.wework.credits")
 }
 

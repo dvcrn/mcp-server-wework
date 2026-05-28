@@ -129,6 +129,34 @@ func TestBuildBookingTimeRangeFallsBackWhenAvailabilityTimesAreEqual(t *testing.
 	}
 }
 
+func TestBuildBookingTimeRangeRejectsNilWorkspace(t *testing.T) {
+	if _, err := buildBookingTimeRange(time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC), nil); err == nil {
+		t.Fatal("expected error for nil workspace")
+	}
+}
+
+func TestBuildBookingTimeRangeNormalizesShortTimeStrings(t *testing.T) {
+	space := &Workspace{
+		OpenTime:  "9:00",
+		CloseTime: "18:00:00",
+		Location: Location{
+			TimeZone: "Europe/London",
+		},
+	}
+
+	times, err := buildBookingTimeRange(time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC), space)
+	if err != nil {
+		t.Fatalf("buildBookingTimeRange returned error: %v", err)
+	}
+
+	if times.Open != "09:00" {
+		t.Fatalf("unexpected open time: %s", times.Open)
+	}
+	if times.Close != "18:00" {
+		t.Fatalf("unexpected close time: %s", times.Close)
+	}
+}
+
 func TestBuildBookingTimeRangeUsesOperatingHoursForDate(t *testing.T) {
 	space := &Workspace{
 		OpenTime:  "00:00",

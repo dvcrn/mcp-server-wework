@@ -508,6 +508,9 @@ func getBookingSpaceID(space *Workspace) string {
 }
 
 func buildBookingTimeRange(date time.Time, space *Workspace) (bookingTimeRange, error) {
+	if space == nil {
+		return bookingTimeRange{}, fmt.Errorf("workspace cannot be nil")
+	}
 	loc, err := time.LoadLocation(space.Location.TimeZone)
 	if err != nil {
 		return bookingTimeRange{}, err
@@ -528,6 +531,9 @@ func buildBookingTimeRange(date time.Time, space *Workspace) (bookingTimeRange, 
 		close = "23:59"
 		startLocal, _ = localTimeForDate(dateInTz, loc, open)
 		endLocal, _ = localTimeForDate(dateInTz, loc, close)
+	} else {
+		open = startLocal.Format("15:04")
+		close = endLocal.Format("15:04")
 	}
 
 	return bookingTimeRange{
@@ -541,8 +547,8 @@ func buildBookingTimeRange(date time.Time, space *Workspace) (bookingTimeRange, 
 
 func firstTimeString(value, fallback string) string {
 	value = strings.TrimSpace(value)
-	if len(value) >= 5 {
-		return value[:5]
+	if value != "" {
+		return value
 	}
 	return fallback
 }
