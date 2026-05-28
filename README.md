@@ -44,6 +44,7 @@ Add it to your MCP configuration:
 - `locations` — list WeWork locations in a city
 - `desks` — list available spaces for a date
 - `find_space` — alias for `desks`
+- `favorites` / `favourites` — list favorite WeWork locations
 - `bookings` — list upcoming or past bookings
 - `book` — create bookings for one or more dates
 - `quote` — get booking quotes without booking
@@ -67,4 +68,3 @@ mise run test
 mise run build
 ./dist/mcp-server-wework
 ```
-
