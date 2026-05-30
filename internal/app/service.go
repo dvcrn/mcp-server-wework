@@ -179,9 +179,14 @@ type CalendarOutput struct {
 }
 
 type CancelBookingOutput struct {
-	BookingUUID string                        `json:"booking_uuid"`
-	Request     *wework.CancelBookingRequest  `json:"request,omitempty"`
-	Response    *wework.CancelBookingResponse `json:"response,omitempty"`
+	BookingUUID string                       `json:"booking_uuid"`
+	Request     *wework.CancelBookingRequest `json:"request,omitempty"`
+	// Response is a passthrough of whatever wework-cli returns. It is typed as
+	// any so the auto-generated MCP output schema stays permissive: the cancel
+	// endpoint's `raw` field can come back as a boolean, array, or null, which
+	// would otherwise fail validation against the schema reflected from
+	// wework.CancelBookingResponse (json.RawMessage -> ["null","array"]).
+	Response any `json:"response,omitempty"`
 }
 
 func (s *Service) Locations(ctx context.Context, input LocationsInput) (LocationsResult, error) {
