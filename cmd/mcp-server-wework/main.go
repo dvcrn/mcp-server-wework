@@ -123,7 +123,7 @@ func main() {
 		InputSchema: objSchema(map[string]any{
 			"booking_uuid": strSchema("The booking identifier exposed by the bookings tool."),
 		}, "booking_uuid"),
-	}, func(ctx context.Context, input app.CancelBookingInput) (app.CancelBookingOutput, error) {
+	}, func(ctx context.Context, input app.CancelBookingInput) (any, error) {
 		return service.CancelBooking(ctx, input)
 	})
 

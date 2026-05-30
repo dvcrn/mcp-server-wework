@@ -179,14 +179,9 @@ type CalendarOutput struct {
 }
 
 type CancelBookingOutput struct {
-	BookingUUID string                       `json:"booking_uuid"`
-	Request     *wework.CancelBookingRequest `json:"request,omitempty"`
-	// Response is a passthrough of whatever wework-cli returns. It is typed as
-	// any so the auto-generated MCP output schema stays permissive: the cancel
-	// endpoint's `raw` field can come back as a boolean, array, or null, which
-	// would otherwise fail validation against the schema reflected from
-	// wework.CancelBookingResponse (json.RawMessage -> ["null","array"]).
-	Response any `json:"response,omitempty"`
+	BookingUUID string                        `json:"booking_uuid"`
+	Request     *wework.CancelBookingRequest  `json:"request,omitempty"`
+	Response    *wework.CancelBookingResponse `json:"response,omitempty"`
 }
 
 func (s *Service) Locations(ctx context.Context, input LocationsInput) (LocationsResult, error) {
@@ -513,25 +508,32 @@ func (s *Service) Calendar(ctx context.Context, input CalendarInput) (CalendarOu
 	return CalendarOutput{BookingsCount: len(allBookings), ICS: buf.String()}, nil
 }
 
-func (s *Service) CancelBooking(ctx context.Context, input CancelBookingInput) (CancelBookingOutput, error) {
+// CancelBooking returns any (not CancelBookingOutput) so the MCP SDK skips
+// output-schema generation and validation for this tool. The cancel endpoint's
+// response body is a bare boolean, which can't be meaningfully schema-typed:
+// reflecting wework.CancelBookingResponse.Raw (json.RawMessage) yields a
+// ["null","array"] schema the boolean fails at runtime, and an `any` field
+// reflects to a bare `true` schema that the MCP client rejects at load time.
+// Mirrors the Me and Info handlers, which return any for the same reason.
+func (s *Service) CancelBooking(ctx context.Context, input CancelBookingInput) (any, error) {
 	_ = ctx
 	if strings.TrimSpace(input.BookingUUID) == "" {
-		return CancelBookingOutput{}, fmt.Errorf("booking_uuid is required")
+		return nil, fmt.Errorf("booking_uuid is required")
 	}
 
 	ww, err := s.clientForRequest()
 	if err != nil {
-		return CancelBookingOutput{}, err
+		return nil, err
 	}
 
 	request, err := ww.BuildCancelBookingRequest(input.BookingUUID)
 	if err != nil {
-		return CancelBookingOutput{}, err
+		return nil, err
 	}
 
 	response, err := ww.CancelBooking(input.BookingUUID)
 	if err != nil {
-		return CancelBookingOutput{}, err
+		return nil, err
 	}
 
 	return CancelBookingOutput{
