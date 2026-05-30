@@ -1,7 +1,7 @@
 {
   "name": "mcp-server-wework",
   "version": "0.1.0",
-  "description": "An MCP server for WeWork bookings and space search, published as a Node package backed by GopherJS.",
+  "description": "MCP server for WeWork bookings and space search",
   "license": "MIT",
   "type": "commonjs",
   "bin": {
@@ -14,10 +14,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "mise run build_js",
-    "build:native": "mise run build_native",
+    "build": "mise run build",
     "test": "mise run test",
-    "prepack": "mise run build_js"
+    "prepack": "mise run build"
   },
   "keywords": [
     "mcp",

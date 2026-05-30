@@ -1,11 +1,6 @@
 package app
 
-import (
-	"testing"
-	"time"
-
-	"github.com/dvcrn/mcp-server-wework/internal/wework"
-)
+import "testing"
 
 func TestParseDateSelection(t *testing.T) {
 	t.Run("single date", func(t *testing.T) {
@@ -40,47 +35,4 @@ func TestParseDateSelection(t *testing.T) {
 			t.Fatalf("unexpected end date: %s", dates[2].Format("2006-01-02"))
 		}
 	})
-}
-
-func TestBuildCancelRequest(t *testing.T) {
-	booking := &wework.Booking{
-		UUID:     "booking-uuid",
-		StartsAt: wework.CustomTime{Time: time.Date(2026, 4, 6, 8, 30, 0, 0, time.UTC)},
-		EndsAt:   wework.CustomTime{Time: time.Date(2026, 4, 6, 20, 0, 0, 0, time.UTC)},
-		CreditOrder: &wework.CreditOrder{
-			Price: "2",
-		},
-		Reservable: &wework.SharedWorkspace{
-			UUID:     "space-uuid",
-			TypeName: "PrivateOffice",
-			Location: &wework.SharedWorkspaceLocation{
-				UUID:       "location-uuid",
-				Name:       "WeWork Bryant Park",
-				SourceType: 7,
-				Address: wework.Address{
-					Line1: "54 W 40th St",
-				},
-			},
-		},
-	}
-
-	request, err := buildCancelRequest(booking, CancelBookingInput{BookingUUID: booking.UUID})
-	if err != nil {
-		t.Fatalf("buildCancelRequest returned error: %v", err)
-	}
-	if request.BookingID != "booking-uuid" {
-		t.Fatalf("unexpected BookingID: %s", request.BookingID)
-	}
-	if request.BookingLocationType != 7 {
-		t.Fatalf("unexpected BookingLocationType: %d", request.BookingLocationType)
-	}
-	if request.BookingType != cancelBookingTypePrivateOffice {
-		t.Fatalf("unexpected BookingType: %d", request.BookingType)
-	}
-	if request.LocationID != "location-uuid" {
-		t.Fatalf("unexpected LocationID: %s", request.LocationID)
-	}
-	if request.ReservableID != "space-uuid" {
-		t.Fatalf("unexpected ReservableID: %s", request.ReservableID)
-	}
 }

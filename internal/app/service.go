@@ -10,19 +10,10 @@ import (
 	"time"
 
 	ics "github.com/arran4/golang-ical"
+	"github.com/dvcrn/wework-cli/pkg/wework"
 	"github.com/sahilm/fuzzy"
 
 	"github.com/dvcrn/mcp-server-wework/internal/tzdate"
-	"github.com/dvcrn/mcp-server-wework/internal/wework"
-)
-
-const (
-	platformWeb = 1
-	platformIOS = 2
-
-	cancelBookingTypeConferenceRoom = 0
-	cancelBookingTypePrivateOffice  = 2
-	cancelBookingTypeSharedDesk     = 4
 )
 
 type Service struct {
@@ -117,15 +108,7 @@ type MeInput struct {
 type CalendarInput struct{}
 
 type CancelBookingInput struct {
-	BookingUUID         string `json:"booking_uuid"`
-	BookingID           string `json:"booking_id,omitempty"`
-	BookingLocationType *int   `json:"booking_location_type,omitempty"`
-	ReservableID        string `json:"reservable_id,omitempty"`
-	LocationID          string `json:"location_id,omitempty"`
-	BookingType         *int   `json:"booking_type,omitempty"`
-	ReservationID       string `json:"reservation_id,omitempty"`
-	IsOnDemand          bool   `json:"is_on_demand,omitempty"`
-	PlatformType        int    `json:"platform_type,omitempty"`
+	BookingUUID string `json:"booking_uuid"`
 }
 
 type AvailableSpace struct {
@@ -139,18 +122,17 @@ type AvailableSpace struct {
 }
 
 type CompactBooking struct {
-	UUID           string                       `json:"uuid"`
-	Date           string                       `json:"date"`
-	StartTime      string                       `json:"start_time"`
-	EndTime        string                       `json:"end_time"`
-	LocationName   string                       `json:"location_name"`
-	LocationUUID   string                       `json:"location_uuid"`
-	Address        string                       `json:"address"`
-	City           string                       `json:"city"`
-	Credits        string                       `json:"credits"`
-	ReservableUUID string                       `json:"reservable_uuid,omitempty"`
-	ReservableType string                       `json:"reservable_type,omitempty"`
-	Cancellation   *wework.CancelBookingRequest `json:"cancellation,omitempty"`
+	UUID           string `json:"uuid"`
+	Date           string `json:"date"`
+	StartTime      string `json:"start_time"`
+	EndTime        string `json:"end_time"`
+	LocationName   string `json:"location_name"`
+	LocationUUID   string `json:"location_uuid"`
+	Address        string `json:"address"`
+	City           string `json:"city"`
+	Credits        string `json:"credits"`
+	ReservableUUID string `json:"reservable_uuid,omitempty"`
+	ReservableType string `json:"reservable_type,omitempty"`
 }
 
 type BookResult struct {
@@ -197,9 +179,9 @@ type CalendarOutput struct {
 }
 
 type CancelBookingOutput struct {
-	BookingUUID string                      `json:"booking_uuid"`
-	Request     wework.CancelBookingRequest `json:"request"`
-	Response    map[string]any              `json:"response"`
+	BookingUUID string                        `json:"booking_uuid"`
+	Request     *wework.CancelBookingRequest  `json:"request,omitempty"`
+	Response    *wework.CancelBookingResponse `json:"response,omitempty"`
 }
 
 func (s *Service) Locations(ctx context.Context, input LocationsInput) (LocationsResult, error) {
@@ -256,9 +238,9 @@ func (s *Service) Desks(ctx context.Context, input DesksInput) (DesksResult, err
 			ReservableID:    space.UUID,
 			LocationID:      space.Location.UUID,
 			Available:       space.Seat.Available,
-			ReservableType:  space.ReservableTypeName(),
-			ReservableName:  space.ReservableName(),
-			ReservableFloor: space.ReservableFloorName(),
+			ReservableType:  reservableTypeName(space),
+			ReservableName:  reservableName(space),
+			ReservableFloor: reservableFloorName(space),
 		})
 	}
 
@@ -537,33 +519,12 @@ func (s *Service) CancelBooking(ctx context.Context, input CancelBookingInput) (
 		return CancelBookingOutput{}, err
 	}
 
-	bookings, err := ww.GetUpcomingBookings()
-	if err != nil {
-		return CancelBookingOutput{}, fmt.Errorf("failed to fetch upcoming bookings: %w", err)
-	}
-
-	var target *wework.Booking
-	for _, booking := range bookings {
-		if booking != nil && booking.UUID == input.BookingUUID {
-			target = booking
-			break
-		}
-	}
-	if target == nil {
-		return CancelBookingOutput{}, fmt.Errorf("no upcoming booking found with uuid %s", input.BookingUUID)
-	}
-
-	request, err := buildCancelRequest(target, input)
+	request, err := ww.BuildCancelBookingRequest(input.BookingUUID)
 	if err != nil {
 		return CancelBookingOutput{}, err
 	}
 
-	platformType := input.PlatformType
-	if platformType == 0 {
-		platformType = platformIOS
-	}
-
-	response, err := ww.CancelBooking(request, input.IsOnDemand, platformType)
+	response, err := ww.CancelBooking(input.BookingUUID)
 	if err != nil {
 		return CancelBookingOutput{}, err
 	}
@@ -573,6 +534,30 @@ func (s *Service) CancelBooking(ctx context.Context, input CancelBookingInput) (
 		Request:     request,
 		Response:    response,
 	}, nil
+}
+
+func reservableTypeName(space wework.Workspace) string {
+	if space.Reservable == nil {
+		return ""
+	}
+	if space.IsHybridSpace {
+		return "HybridSpace"
+	}
+	if space.IsAffiliateCoworking {
+		return "AffiliateCoworking"
+	}
+	if space.IsFranchiseCoworking {
+		return "FranchiseCoworking"
+	}
+	return "Workspace"
+}
+
+func reservableName(space wework.Workspace) string {
+	return space.Location.Name
+}
+
+func reservableFloorName(space wework.Workspace) string {
+	return ""
 }
 
 func resolveLocationUUIDsForDesks(ww *wework.WeWork, locationUUID, city string) ([]string, string, error) {
@@ -731,89 +716,6 @@ func compactBookingFromModel(booking *wework.Booking) CompactBooking {
 			result.Address = booking.Reservable.Location.Address.Line1
 			result.City = booking.Reservable.Location.Address.City
 		}
-		if cancellation, err := buildCancelRequest(booking, CancelBookingInput{BookingUUID: booking.UUID}); err == nil {
-			result.Cancellation = &cancellation
-		}
 	}
 	return result
-}
-
-func buildCancelRequest(booking *wework.Booking, input CancelBookingInput) (wework.CancelBookingRequest, error) {
-	if booking == nil || booking.Reservable == nil || booking.Reservable.Location == nil {
-		return wework.CancelBookingRequest{}, fmt.Errorf("booking is missing reservable location data")
-	}
-
-	bookingLocationType := booking.Reservable.Location.SourceType
-	if input.BookingLocationType != nil {
-		bookingLocationType = *input.BookingLocationType
-	}
-
-	bookingID := input.BookingID
-	if bookingID == "" {
-		bookingID = booking.UUID
-		if booking.IsFromKube && booking.KubeBookingExternalReference != "" {
-			bookingID = booking.KubeBookingExternalReference
-		}
-	}
-
-	bookingType := cancelBookingTypeSharedDesk
-	if input.BookingType != nil {
-		bookingType = *input.BookingType
-	} else {
-		bookingType = cancelBookingTypeFromTypeName(booking.Reservable.TypeName)
-	}
-
-	reservationID := firstNonEmpty(input.ReservationID, booking.UUID)
-	locationID := firstNonEmpty(input.LocationID, booking.Reservable.Location.UUID)
-	reservableID := firstNonEmpty(input.ReservableID, booking.Reservable.UUID)
-	creditsUsed := ""
-	if booking.CreditOrder != nil {
-		creditsUsed = booking.CreditOrder.Price
-	}
-
-	return wework.CancelBookingRequest{
-		BookingID:           bookingID,
-		BookingLocationType: bookingLocationType,
-		ReservableID:        reservableID,
-		StartTime:           booking.StartsAt.Time.Format(time.RFC3339),
-		EndTime:             booking.EndsAt.Time.Format(time.RFC3339),
-		CreditsUsed:         creditsUsed,
-		LocationID:          locationID,
-		MailParams:          cancelMailDataFromBooking(booking),
-		BookingType:         bookingType,
-		ReservationID:       reservationID,
-	}, nil
-}
-
-func cancelMailDataFromBooking(booking *wework.Booking) wework.CancelMailData {
-	locationName := ""
-	address := ""
-	workspaceType := ""
-	if booking != nil && booking.Reservable != nil {
-		workspaceType = booking.Reservable.TypeName
-		if booking.Reservable.Location != nil {
-			locationName = booking.Reservable.Location.Name
-			address = booking.Reservable.Location.Address.Line1
-		}
-	}
-	locationAddress := strings.TrimSpace(strings.TrimSpace(locationName + " " + address))
-	return wework.CancelMailData{
-		WorkspaceType:      workspaceType,
-		DayFormatted:       booking.StartsAt.Time.Format("Monday, January 2"),
-		StartTimeFormatted: booking.StartsAt.Time.Format("3:04 PM"),
-		EndTimeFormatted:   booking.EndsAt.Time.Format("3:04 PM"),
-		FloorAddress:       "",
-		LocationAddress:    locationAddress,
-	}
-}
-
-func cancelBookingTypeFromTypeName(typeName string) int {
-	switch typeName {
-	case "ConferenceRoom":
-		return cancelBookingTypeConferenceRoom
-	case "PrivateOffice":
-		return cancelBookingTypePrivateOffice
-	default:
-		return cancelBookingTypeSharedDesk
-	}
 }

@@ -164,17 +164,9 @@ func main() {
 
 	server.AddTool(mcp.Tool{
 		Name:        "cancel_booking",
-		Description: "Cancel an upcoming booking by booking UUID. Optional override fields are available if WeWork's cancellation payload needs adjustment.",
+		Description: "Cancel an upcoming booking by the identifier exposed by the bookings tool.",
 		InputSchema: objSchema(map[string]any{
-			"booking_uuid":          strSchema("The UUID of the upcoming booking to cancel."),
-			"booking_id":            strSchema("Optional override for bookingId in the cancellation request."),
-			"booking_location_type": intSchema("Optional override for bookingLocationType. Defaults to the booking's sourceType or 0."),
-			"reservable_id":         strSchema("Optional override for reservableId."),
-			"location_id":           strSchema("Optional override for locationId."),
-			"booking_type":          intSchema("Optional override for bookingType. 0=conference room, 2=private office, 4=shared workspace."),
-			"reservation_id":        strSchema("Optional override for reservationId."),
-			"is_on_demand":          boolSchema("Optional override for the isOnDemand query param. Defaults to false."),
-			"platform_type":         intSchema("Optional override for platFormType. Defaults to 2 (iOS app)."),
+			"booking_uuid": strSchema("The booking identifier exposed by the bookings tool."),
 		}, "booking_uuid"),
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var input app.CancelBookingInput
@@ -218,8 +210,4 @@ func strSchema(description string) map[string]any {
 
 func boolSchema(description string) map[string]any {
 	return map[string]any{"type": "boolean", "description": description}
-}
-
-func intSchema(description string) map[string]any {
-	return map[string]any{"type": "integer", "description": description}
 }
