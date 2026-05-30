@@ -29,7 +29,8 @@ function getCacheFile() {
 
   if (process.platform === "win32") {
     const base = process.env.LOCALAPPDATA || process.env.APPDATA;
-    if (!base) return path.join(home, "AppData", "Local", CACHE_DIR_NAME, "update.json");
+    if (!base)
+      return path.join(home, "AppData", "Local", CACHE_DIR_NAME, "update.json");
     return path.join(base, CACHE_DIR_NAME, "update.json");
   }
 
@@ -64,24 +65,28 @@ function fetchLatestVersion(packageName, timeoutMs, signal) {
   const url = `https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`;
 
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { "User-Agent": `${DEFAULT_PACKAGE_NAME}-update-check` } }, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`GET ${url} -> ${res.statusCode}`));
-        res.resume();
-        return;
-      }
-
-      const chunks = [];
-      res.on("data", (c) => chunks.push(c));
-      res.on("end", () => {
-        try {
-          const json = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          resolve(typeof json.version === "string" ? json.version : "");
-        } catch (e) {
-          reject(e);
+    const req = https.get(
+      url,
+      { headers: { "User-Agent": `${DEFAULT_PACKAGE_NAME}-update-check` } },
+      (res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`GET ${url} -> ${res.statusCode}`));
+          res.resume();
+          return;
         }
-      });
-    });
+
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          try {
+            const json = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+            resolve(typeof json.version === "string" ? json.version : "");
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+    );
 
     req.on("error", reject);
     req.setTimeout(timeoutMs, () => req.destroy(new Error("timeout")));
@@ -91,7 +96,11 @@ function fetchLatestVersion(packageName, timeoutMs, signal) {
         req.destroy(new Error("aborted"));
         return;
       }
-      signal.addEventListener("abort", () => req.destroy(new Error("aborted")), { once: true });
+      signal.addEventListener(
+        "abort",
+        () => req.destroy(new Error("aborted")),
+        { once: true },
+      );
     }
   });
 }
@@ -107,13 +116,22 @@ function normalizeVersion(version) {
 function printNotice({ packageName, installed, latest, updateCommand }) {
   const prefix = `${packageName}:`;
   if (installed && latest) {
-    console.error(`${prefix} an update is available (installed ${installed}, latest ${latest}). Update with: ${updateCommand}`);
+    console.error(
+      `${prefix} an update is available (installed ${installed}, latest ${latest}). Update with: ${updateCommand}`,
+    );
     return;
   }
-  console.error(`${prefix} an update is available. Update with: ${updateCommand}`);
+  console.error(
+    `${prefix} an update is available. Update with: ${updateCommand}`,
+  );
 }
 
-async function runUpdateCheck({ packageName, installedVersion, updateCommand, signal }) {
+async function runUpdateCheck({
+  packageName,
+  installedVersion,
+  updateCommand,
+  signal,
+}) {
   if (isDisabled()) return;
   if (!process.stderr.isTTY) return;
 
@@ -121,8 +139,12 @@ async function runUpdateCheck({ packageName, installedVersion, updateCommand, si
   if (!installed) return;
 
   const cache = readCache() || {};
-  const lastChecked = Number.isFinite(cache.lastChecked) ? cache.lastChecked : 0;
-  const lastNotified = Number.isFinite(cache.lastNotified) ? cache.lastNotified : 0;
+  const lastChecked = Number.isFinite(cache.lastChecked)
+    ? cache.lastChecked
+    : 0;
+  const lastNotified = Number.isFinite(cache.lastNotified)
+    ? cache.lastNotified
+    : 0;
   const cachedLatest = typeof cache.latest === "string" ? cache.latest : "";
 
   const now = Date.now();
@@ -131,14 +153,23 @@ async function runUpdateCheck({ packageName, installedVersion, updateCommand, si
     const latestCached = normalizeVersion(cachedLatest);
     if (latestCached && semver.gt(latestCached, installed)) {
       if (!lastNotified || now - lastNotified >= UPDATE_CHECK_INTERVAL_MS) {
-        printNotice({ packageName, installed, latest: latestCached, updateCommand });
+        printNotice({
+          packageName,
+          installed,
+          latest: latestCached,
+          updateCommand,
+        });
         writeCache({ ...cache, lastNotified: now });
       }
     }
     return;
   }
 
-  const latestRaw = await fetchLatestVersion(packageName, UPDATE_CHECK_TIMEOUT_MS, signal);
+  const latestRaw = await fetchLatestVersion(
+    packageName,
+    UPDATE_CHECK_TIMEOUT_MS,
+    signal,
+  );
   const latest = normalizeVersion(latestRaw);
 
   writeCache({ lastChecked: now, lastNotified, latest: latest || latestRaw });
@@ -158,7 +189,12 @@ function startUpdateCheck({
   signal,
 } = {}) {
   // Fire-and-forget; never block MCP server startup.
-  runUpdateCheck({ packageName, installedVersion, updateCommand, signal }).catch(() => {});
+  runUpdateCheck({
+    packageName,
+    installedVersion,
+    updateCommand,
+    signal,
+  }).catch(() => {});
 }
 
 module.exports = {
