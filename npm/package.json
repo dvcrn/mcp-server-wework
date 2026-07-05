@@ -1,6 +1,6 @@
 {
   "name": "mcp-server-wework",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MCP server for WeWork bookings and space search",
   "scripts": {
     "postinstall": "node postinstall.js"
