@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/arran4/golang-ical v0.3.1
-	github.com/dvcrn/wework-cli v0.0.0-20260530094004-dce2ef554d66
+	github.com/dvcrn/wework-cli v0.0.0-20260705170110-c2f20385078c
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/sahilm/fuzzy v0.1.1
 )
