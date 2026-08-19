@@ -127,6 +127,74 @@ func main() {
 		return service.CancelBooking(ctx, input)
 	})
 
+	addTool(server, &mcp.Tool{
+		Name:        "favorites",
+		Description: "List the member's favorite and recent WeWork locations for a space type. space_type must be 0-3 (defaults to 0); other values are rejected by the API.",
+		InputSchema: objSchema(map[string]any{
+			"space_type": intSchema("Space type to query, 0-3. Defaults to 0."),
+		}),
+	}, func(ctx context.Context, input app.FavoritesInput) (app.FavoritesResult, error) {
+		return service.Favorites(ctx, input)
+	})
+
+	addTool(server, &mcp.Tool{
+		Name:        "add_favorite",
+		Description: "Favorite a WeWork location by UUID.",
+		InputSchema: objSchema(map[string]any{
+			"location_uuid":         strSchema("Location UUID to favorite."),
+			"space_type":            intSchema("Space type, 0-3. Defaults to 0."),
+			"location_type":         intSchema("Optional location type; defaults to the app value."),
+			"location_account_type": intSchema("Optional location account type; defaults to the app value."),
+			"reservable_uuid":       strSchema("Optional reservable UUID for a specific space."),
+			"space_id":              intSchema("Optional numeric space id."),
+			"inventory_name":        strSchema("Optional inventory/space name."),
+			"inventory_image_url":   strSchema("Optional inventory/space image URL."),
+			"floor_id":              intSchema("Optional floor id."),
+		}, "location_uuid"),
+	}, func(ctx context.Context, input app.FavoriteMutationInput) (any, error) {
+		return service.AddFavorite(ctx, input)
+	})
+
+	addTool(server, &mcp.Tool{
+		Name:        "remove_favorite",
+		Description: "Remove a WeWork location from the member's favorites. Provide location_uuid (resolved against the current favorites) or the exact hmy id.",
+		InputSchema: objSchema(map[string]any{
+			"location_uuid": strSchema("Location UUID to remove; resolved to the favorite's id via the current favorites list."),
+			"hmy":           intSchema("Exact favorite id (the hmy value from the favorites tool). Skips lookup when provided."),
+			"space_type":    intSchema("Space type, 0-3. Defaults to 0. Used when resolving location_uuid."),
+		}),
+	}, func(ctx context.Context, input app.FavoriteMutationInput) (any, error) {
+		return service.RemoveFavorite(ctx, input)
+	})
+
+	addTool(server, &mcp.Tool{
+		Name:        "print_queue",
+		Description: "List the member's WeWork print hub queue.",
+		InputSchema: objSchema(map[string]any{
+			"job_ids": strSchema("Optional comma-separated job ids to filter by. Defaults to the full queue."),
+		}),
+	}, func(ctx context.Context, input app.PrintQueueInput) (any, error) {
+		return service.PrintQueue(ctx, input)
+	})
+
+	addTool(server, &mcp.Tool{
+		Name:        "add_print_job",
+		Description: "Upload a document to the member's WeWork print hub queue. Provide the file as base64.",
+		InputSchema: objSchema(map[string]any{
+			"file_name":         strSchema("File name, e.g. document.pdf."),
+			"file_base64":       strSchema("Base64-encoded file contents."),
+			"file_content_type": strSchema("MIME type of the file. Defaults to application/octet-stream."),
+			"job_name":          strSchema("Optional job name. Defaults to the file name."),
+			"copies":            intSchema("Number of copies. Defaults to 1."),
+			"orientation":       strSchema("Orientation, e.g. portrait or landscape. Defaults to portrait."),
+			"color_mode":        strSchema("Color mode, e.g. monochrome or color. Defaults to monochrome."),
+			"sides":             strSchema("Sides, e.g. one-sided or two-sided-long-edge. Defaults to one-sided."),
+			"force_media_size":  strSchema("Optional media size override."),
+		}, "file_name", "file_base64"),
+	}, func(ctx context.Context, input app.AddPrintJobInput) (any, error) {
+		return service.AddPrintJob(ctx, input)
+	})
+
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil && !isExpectedStdioClose(err) {
 		log.Fatal(err)
 	}
@@ -161,4 +229,8 @@ func strSchema(description string) map[string]any {
 
 func boolSchema(description string) map[string]any {
 	return map[string]any{"type": "boolean", "description": description}
+}
+
+func intSchema(description string) map[string]any {
+	return map[string]any{"type": "integer", "description": description}
 }

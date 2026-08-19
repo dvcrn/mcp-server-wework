@@ -51,6 +51,11 @@ Add it to your MCP configuration:
 - `me` — fetch the current user profile
 - `calendar` — generate an ICS payload from bookings
 - `cancel_booking` — cancel an upcoming booking by booking UUID
+- `favorites` — list favorite and recent locations for a space type (0–3)
+- `add_favorite` — favorite a location
+- `remove_favorite` — remove a location from favorites
+- `print_queue` — list the print hub queue
+- `add_print_job` — upload a base64-encoded document to the print hub queue
 
 ## Credentials
 
