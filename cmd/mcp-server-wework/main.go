@@ -50,7 +50,7 @@ func main() {
 
 	addTool(server, &mcp.Tool{
 		Name:        "bookings",
-		Description: "List upcoming bookings, or past bookings with optional date filters.",
+		Description: "List upcoming bookings, or past bookings with optional date filters. Times are in the booking location's timezone: date/start_time/end_time are local wall clock, timezone is the IANA zone, and starts_at/ends_at (with offset) plus starts_at_utc/ends_at_utc give unambiguous timestamps.",
 		InputSchema: objSchema(map[string]any{
 			"past":       boolSchema("Set true to fetch past bookings instead of upcoming bookings."),
 			"start_date": strSchema("Optional start date for past bookings in YYYY-MM-DD format."),

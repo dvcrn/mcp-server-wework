@@ -121,18 +121,30 @@ type AvailableSpace struct {
 	ReservableFloor string `json:"reservable_floor,omitempty"`
 }
 
+// CompactBooking reports booking times in the location's timezone. date,
+// start_time and end_time are local wall clock; starts_at/ends_at repeat them as
+// RFC 3339 timestamps with offset, and starts_at_utc/ends_at_utc give the absolute
+// instants for ordering and comparison. When the location's timezone cannot be
+// resolved the timestamp fields are omitted and timezone_warning says so, rather
+// than emitting a zoneless time that looks interpretable.
 type CompactBooking struct {
-	UUID           string `json:"uuid"`
-	Date           string `json:"date"`
-	StartTime      string `json:"start_time"`
-	EndTime        string `json:"end_time"`
-	LocationName   string `json:"location_name"`
-	LocationUUID   string `json:"location_uuid"`
-	Address        string `json:"address"`
-	City           string `json:"city"`
-	Credits        string `json:"credits"`
-	ReservableUUID string `json:"reservable_uuid,omitempty"`
-	ReservableType string `json:"reservable_type,omitempty"`
+	UUID            string `json:"uuid"`
+	Date            string `json:"date"`
+	StartTime       string `json:"start_time"`
+	EndTime         string `json:"end_time"`
+	StartsAt        string `json:"starts_at,omitempty"`
+	EndsAt          string `json:"ends_at,omitempty"`
+	StartsAtUTC     string `json:"starts_at_utc,omitempty"`
+	EndsAtUTC       string `json:"ends_at_utc,omitempty"`
+	Timezone        string `json:"timezone,omitempty"`
+	TimezoneWarning string `json:"timezone_warning,omitempty"`
+	LocationName    string `json:"location_name"`
+	LocationUUID    string `json:"location_uuid"`
+	Address         string `json:"address"`
+	City            string `json:"city"`
+	Credits         string `json:"credits"`
+	ReservableUUID  string `json:"reservable_uuid,omitempty"`
+	ReservableType  string `json:"reservable_type,omitempty"`
 }
 
 type BookResult struct {
@@ -707,10 +719,22 @@ func compactBookingFromModel(booking *wework.Booking) CompactBooking {
 		return result
 	}
 
+	startsAt := booking.StartsAt.Time
+	endsAt := booking.EndsAt.Time
+
 	result.UUID = booking.UUID
-	result.Date = booking.StartsAt.Time.Format("2006-01-02")
-	result.StartTime = booking.StartsAt.Time.Format("15:04")
-	result.EndTime = booking.EndsAt.Time.Format("15:04")
+	result.Date = startsAt.Format("2006-01-02")
+	result.StartTime = startsAt.Format("15:04")
+	result.EndTime = endsAt.Format("15:04")
+	result.Timezone = bookingTimezone(booking)
+	if result.Timezone == "" {
+		result.TimezoneWarning = "timezone unavailable for this booking; times are wall clock as reported by the API and cannot be resolved to an absolute instant"
+	} else {
+		result.StartsAt = startsAt.Format(time.RFC3339)
+		result.EndsAt = endsAt.Format(time.RFC3339)
+		result.StartsAtUTC = startsAt.UTC().Format(time.RFC3339)
+		result.EndsAtUTC = endsAt.UTC().Format(time.RFC3339)
+	}
 	if booking.CreditOrder != nil {
 		result.Credits = booking.CreditOrder.Price
 	}
@@ -725,4 +749,16 @@ func compactBookingFromModel(booking *wework.Booking) CompactBooking {
 		}
 	}
 	return result
+}
+
+// bookingTimezone returns the IANA timezone the booking's times are expressed in,
+// preferring the booking's own field and falling back to its location's.
+func bookingTimezone(booking *wework.Booking) string {
+	if booking.TimeZone != "" {
+		return booking.TimeZone
+	}
+	if booking.Reservable != nil && booking.Reservable.Location != nil {
+		return booking.Reservable.Location.TimeZone
+	}
+	return ""
 }
