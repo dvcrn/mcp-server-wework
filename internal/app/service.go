@@ -116,26 +116,28 @@ type FavoritesInput struct {
 	SpaceType int `json:"space_type,omitempty"`
 }
 
-type FavoriteMutationInput struct {
-	LocationUUID        string `json:"location_uuid,omitempty"`
-	Hmy                 int    `json:"hmy,omitempty"`
-	SpaceType           int    `json:"space_type,omitempty"`
-	LocationType        int    `json:"location_type,omitempty"`
-	LocationAccountType int    `json:"location_account_type,omitempty"`
-	ReservableUUID      string `json:"reservable_uuid,omitempty"`
-	SpaceID             int    `json:"space_id,omitempty"`
-	InventoryName       string `json:"inventory_name,omitempty"`
-	InventoryImageURL   string `json:"inventory_image_url,omitempty"`
-	FloorID             int    `json:"floor_id,omitempty"`
+type AddFavoriteInput struct {
+	LocationUUID string `json:"location_uuid,omitempty"`
+	City         string `json:"city,omitempty"`
+	Name         string `json:"name,omitempty"`
+	SpaceType    int    `json:"space_type,omitempty"`
 }
 
-// Defaults for favorite mutations, matching the values the WeWork web/iOS app
-// sends. LocationType/LocationAccountType are overridable per request.
+type RemoveFavoriteInput struct {
+	LocationUUID string `json:"location_uuid,omitempty"`
+	City         string `json:"city,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Hmy          int    `json:"hmy,omitempty"`
+}
+
+// Constants for favorite mutations, matching the values the WeWork web/iOS app
+// sends. Mirrors the wework-cli favorites commands.
 const (
 	favoritePlatformType    = "iOS_APP"
 	favoriteApplicationType = "WorkplaceOne"
 	favoriteLocationType    = 2
 	favoriteAccountType     = 4
+	favoriteMaxSpaceType    = 3
 )
 
 type PrintQueueInput struct {
@@ -618,84 +620,82 @@ func (s *Service) Favorites(ctx context.Context, input FavoritesInput) (Favorite
 	return FavoritesResult{Items: resp.FavoriteLocations, Recents: resp.RecentLocations}, nil
 }
 
-// AddFavorite favorites a location by UUID.
-func (s *Service) AddFavorite(ctx context.Context, input FavoriteMutationInput) (any, error) {
+// AddFavorite favorites a location, identified by UUID or by city + name.
+func (s *Service) AddFavorite(ctx context.Context, input AddFavoriteInput) (any, error) {
 	_ = ctx
-	if strings.TrimSpace(input.LocationUUID) == "" {
-		return nil, fmt.Errorf("location_uuid is required")
-	}
 	ww, err := s.clientForRequest()
 	if err != nil {
 		return nil, err
 	}
-	return ww.MarkFavoriteLocation(favoriteRequest(input, false, 0))
+	uuid, err := resolveLocationUUID(ww, input.City, input.Name, input.LocationUUID)
+	if err != nil {
+		return nil, err
+	}
+	return ww.MarkFavoriteLocation(favoriteRequest(uuid, input.SpaceType, false, 0))
 }
 
 // RemoveFavorite removes a location from the member's favorites. The API deletes
-// by the favorite's numeric Hmy (its "Id"), so when only a location_uuid is given
-// the current favorites are looked up to resolve every matching Hmy.
-func (s *Service) RemoveFavorite(ctx context.Context, input FavoriteMutationInput) (any, error) {
+// by the favorite's numeric id (its "hmy"), so unless an exact hmy is given the
+// location is resolved (by UUID or city + name) and matched against the current
+// favorites across every space type to find the id(s) to delete.
+func (s *Service) RemoveFavorite(ctx context.Context, input RemoveFavoriteInput) (any, error) {
 	_ = ctx
 	ww, err := s.clientForRequest()
 	if err != nil {
 		return nil, err
 	}
 
-	ids := []int{}
 	if input.Hmy > 0 {
-		ids = append(ids, input.Hmy)
-	} else if strings.TrimSpace(input.LocationUUID) != "" {
-		favs, err := ww.GetFavoriteLocations(input.SpaceType)
+		return ww.MarkFavoriteLocation(favoriteRequest("", 0, true, input.Hmy))
+	}
+
+	uuid, err := resolveLocationUUID(ww, input.City, input.Name, input.LocationUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	type match struct {
+		id        int
+		spaceType int
+	}
+	var matches []match
+	for st := 0; st <= favoriteMaxSpaceType; st++ {
+		favs, err := ww.GetFavoriteLocations(st)
 		if err != nil {
-			return nil, fmt.Errorf("failed to look up favorites: %w", err)
+			return nil, fmt.Errorf("failed to look up favorites (space_type %d): %w", st, err)
 		}
 		for _, f := range favs.FavoriteLocations {
-			if f.LocationID == input.LocationUUID && f.Hmy > 0 {
-				ids = append(ids, f.Hmy)
+			if f.LocationID == uuid && f.Hmy > 0 {
+				matches = append(matches, match{id: f.Hmy, spaceType: st})
 			}
 		}
-		if len(ids) == 0 {
-			return nil, fmt.Errorf("location %s is not in your favorites for space_type %d", input.LocationUUID, input.SpaceType)
-		}
-	} else {
-		return nil, fmt.Errorf("hmy or location_uuid is required")
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("location %s is not in your favorites", uuid)
 	}
 
 	var last map[string]any
-	for _, id := range ids {
-		last, err = ww.MarkFavoriteLocation(favoriteRequest(input, true, id))
+	for _, m := range matches {
+		last, err = ww.MarkFavoriteLocation(favoriteRequest("", m.spaceType, true, m.id))
 		if err != nil {
-			return nil, fmt.Errorf("failed to remove favorite (Id %d): %w", id, err)
+			return nil, fmt.Errorf("failed to remove favorite (id %d): %w", m.id, err)
 		}
 	}
 	return last, nil
 }
 
-// favoriteRequest builds the mark-as-favorite payload, applying the app's default
-// platform/application/location classification when the caller leaves them unset.
-func favoriteRequest(input FavoriteMutationInput, remove bool, id int) wework.MarkFavoriteLocationRequest {
-	locationType := input.LocationType
-	if locationType == 0 {
-		locationType = favoriteLocationType
-	}
-	accountType := input.LocationAccountType
-	if accountType == 0 {
-		accountType = favoriteAccountType
-	}
+// favoriteRequest builds the mark-as-favorite payload with the app's default
+// platform/application/location classification.
+func favoriteRequest(locationUUID string, spaceType int, remove bool, id int) wework.MarkFavoriteLocationRequest {
 	return wework.MarkFavoriteLocationRequest{
 		ID:                  id,
-		LocationID:          input.LocationUUID,
-		SpaceType:           input.SpaceType,
+		LocationID:          locationUUID,
+		SpaceType:           spaceType,
 		IsDeleted:           remove,
-		LocationType:        locationType,
-		LocationAccountType: accountType,
-		ReservableUUID:      input.ReservableUUID,
-		SpaceID:             input.SpaceID,
-		InventoryName:       input.InventoryName,
-		InventoryImageURL:   input.InventoryImageURL,
+		LocationType:        favoriteLocationType,
+		LocationAccountType: favoriteAccountType,
 		PlatformType:        favoritePlatformType,
 		ApplicationType:     favoriteApplicationType,
-		FloorID:             input.FloorID,
 	}
 }
 

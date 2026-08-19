@@ -139,31 +139,27 @@ func main() {
 
 	addTool(server, &mcp.Tool{
 		Name:        "add_favorite",
-		Description: "Favorite a WeWork location by UUID.",
+		Description: "Favorite a WeWork location, identified by location_uuid or by city + name.",
 		InputSchema: objSchema(map[string]any{
-			"location_uuid":         strSchema("Location UUID to favorite."),
-			"space_type":            intSchema("Space type, 0-3. Defaults to 0."),
-			"location_type":         intSchema("Optional location type; defaults to the app value."),
-			"location_account_type": intSchema("Optional location account type; defaults to the app value."),
-			"reservable_uuid":       strSchema("Optional reservable UUID for a specific space."),
-			"space_id":              intSchema("Optional numeric space id."),
-			"inventory_name":        strSchema("Optional inventory/space name."),
-			"inventory_image_url":   strSchema("Optional inventory/space image URL."),
-			"floor_id":              intSchema("Optional floor id."),
-		}, "location_uuid"),
-	}, func(ctx context.Context, input app.FavoriteMutationInput) (any, error) {
+			"location_uuid": strSchema("Location UUID to favorite. Alternatively provide city + name."),
+			"city":          strSchema("City name, used together with name when location_uuid is omitted."),
+			"name":          strSchema("Location name, used together with city when location_uuid is omitted."),
+			"space_type":    intSchema("Space type, 0-3. Defaults to 0."),
+		}),
+	}, func(ctx context.Context, input app.AddFavoriteInput) (any, error) {
 		return service.AddFavorite(ctx, input)
 	})
 
 	addTool(server, &mcp.Tool{
 		Name:        "remove_favorite",
-		Description: "Remove a WeWork location from the member's favorites. Provide location_uuid (resolved against the current favorites) or the exact hmy id.",
+		Description: "Remove a WeWork location from the member's favorites, identified by location_uuid, city + name, or an exact hmy id.",
 		InputSchema: objSchema(map[string]any{
-			"location_uuid": strSchema("Location UUID to remove; resolved to the favorite's id via the current favorites list."),
+			"location_uuid": strSchema("Location UUID to remove. Alternatively provide city + name, or hmy."),
+			"city":          strSchema("City name, used together with name when location_uuid is omitted."),
+			"name":          strSchema("Location name, used together with city when location_uuid is omitted."),
 			"hmy":           intSchema("Exact favorite id (the hmy value from the favorites tool). Skips lookup when provided."),
-			"space_type":    intSchema("Space type, 0-3. Defaults to 0. Used when resolving location_uuid."),
 		}),
-	}, func(ctx context.Context, input app.FavoriteMutationInput) (any, error) {
+	}, func(ctx context.Context, input app.RemoveFavoriteInput) (any, error) {
 		return service.RemoveFavorite(ctx, input)
 	})
 
