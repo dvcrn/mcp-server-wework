@@ -44,7 +44,7 @@ Add it to your MCP configuration:
 - `locations` — list WeWork locations in a city
 - `desks` — list available spaces for a date
 - `find_space` — alias for `desks`
-- `bookings` — list upcoming or past bookings
+- `bookings` — list upcoming or past bookings (times in the location timezone, with RFC 3339 and UTC timestamps)
 - `book` — create bookings for one or more dates
 - `quote` — get booking quotes without booking
 - `info` — get detailed location information
