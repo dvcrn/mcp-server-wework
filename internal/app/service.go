@@ -713,7 +713,7 @@ func (s *Service) AddPrintJob(ctx context.Context, input AddPrintJobInput) (*wew
 	if strings.TrimSpace(input.FileName) == "" {
 		return nil, fmt.Errorf("file_name is required")
 	}
-	fileBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(input.FileBase64))
+	fileBytes, err := decodeBase64Loose(input.FileBase64)
 	if err != nil {
 		return nil, fmt.Errorf("file_base64 is not valid base64: %w", err)
 	}
@@ -735,6 +735,37 @@ func (s *Service) AddPrintJob(ctx context.Context, input AddPrintJobInput) (*wew
 		FileContentType:      input.FileContentType,
 		FileBytes:            fileBytes,
 	})
+}
+
+// decodeBase64Loose decodes base64 that may arrive with surrounding or internal
+// whitespace — LLMs often wrap long payloads at 76 columns like PEM — and may use
+// either the standard or URL-safe alphabet, with or without padding.
+func decodeBase64Loose(s string) ([]byte, error) {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch r {
+		case ' ', '\t', '\n', '\r', '\v', '\f':
+			continue
+		default:
+			b.WriteRune(r)
+		}
+	}
+	cleaned := b.String()
+
+	var err error
+	for _, enc := range []*base64.Encoding{
+		base64.StdEncoding,
+		base64.URLEncoding,
+		base64.RawStdEncoding,
+		base64.RawURLEncoding,
+	} {
+		var decoded []byte
+		if decoded, err = enc.DecodeString(cleaned); err == nil {
+			return decoded, nil
+		}
+	}
+	return nil, err
 }
 
 func reservableTypeName(space wework.Workspace) string {
