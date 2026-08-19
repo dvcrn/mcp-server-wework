@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strings"
@@ -109,6 +110,55 @@ type CalendarInput struct{}
 
 type CancelBookingInput struct {
 	BookingUUID string `json:"booking_uuid"`
+}
+
+type FavoritesInput struct {
+	SpaceType int `json:"space_type,omitempty"`
+}
+
+type AddFavoriteInput struct {
+	LocationUUID string `json:"location_uuid,omitempty"`
+	City         string `json:"city,omitempty"`
+	Name         string `json:"name,omitempty"`
+	SpaceType    int    `json:"space_type,omitempty"`
+}
+
+type RemoveFavoriteInput struct {
+	LocationUUID string `json:"location_uuid,omitempty"`
+	City         string `json:"city,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Hmy          int    `json:"hmy,omitempty"`
+}
+
+// Constants for favorite mutations, matching the values the WeWork web/iOS app
+// sends. Mirrors the wework-cli favorites commands.
+const (
+	favoritePlatformType    = "iOS_APP"
+	favoriteApplicationType = "WorkplaceOne"
+	favoriteLocationType    = 2
+	favoriteAccountType     = 4
+	favoriteMaxSpaceType    = 3
+)
+
+type PrintQueueInput struct {
+	JobIDs string `json:"job_ids,omitempty"`
+}
+
+type AddPrintJobInput struct {
+	FileName        string `json:"file_name"`
+	FileBase64      string `json:"file_base64"`
+	FileContentType string `json:"file_content_type,omitempty"`
+	JobName         string `json:"job_name,omitempty"`
+	Copies          int    `json:"copies,omitempty"`
+	Orientation     string `json:"orientation,omitempty"`
+	ColorMode       string `json:"color_mode,omitempty"`
+	Sides           string `json:"sides,omitempty"`
+	ForceMediaSize  string `json:"force_media_size,omitempty"`
+}
+
+type FavoritesResult struct {
+	Items   []wework.FavoriteLocation `json:"items"`
+	Recents []wework.FavoriteLocation `json:"recents,omitempty"`
 }
 
 type AvailableSpace struct {
@@ -553,6 +603,169 @@ func (s *Service) CancelBooking(ctx context.Context, input CancelBookingInput) (
 		Request:     request,
 		Response:    response,
 	}, nil
+}
+
+// Favorites lists the member's favorite (and recent) locations for a space type.
+// space_type must be 0-3; the WeWork API rejects other values.
+func (s *Service) Favorites(ctx context.Context, input FavoritesInput) (FavoritesResult, error) {
+	_ = ctx
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return FavoritesResult{}, err
+	}
+	resp, err := ww.GetFavoriteLocations(input.SpaceType)
+	if err != nil {
+		return FavoritesResult{}, err
+	}
+	return FavoritesResult{Items: resp.FavoriteLocations, Recents: resp.RecentLocations}, nil
+}
+
+// AddFavorite favorites a location, identified by UUID or by city + name.
+func (s *Service) AddFavorite(ctx context.Context, input AddFavoriteInput) (any, error) {
+	_ = ctx
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return nil, err
+	}
+	uuid, err := resolveLocationUUID(ww, input.City, input.Name, input.LocationUUID)
+	if err != nil {
+		return nil, err
+	}
+	return ww.MarkFavoriteLocation(favoriteRequest(uuid, input.SpaceType, false, 0))
+}
+
+// RemoveFavorite removes a location from the member's favorites. The API deletes
+// by the favorite's numeric id (its "hmy"), so unless an exact hmy is given the
+// location is resolved (by UUID or city + name) and matched against the current
+// favorites across every space type to find the id(s) to delete.
+func (s *Service) RemoveFavorite(ctx context.Context, input RemoveFavoriteInput) (any, error) {
+	_ = ctx
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return nil, err
+	}
+
+	if input.Hmy > 0 {
+		return ww.MarkFavoriteLocation(favoriteRequest("", 0, true, input.Hmy))
+	}
+
+	uuid, err := resolveLocationUUID(ww, input.City, input.Name, input.LocationUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	type match struct {
+		id        int
+		spaceType int
+	}
+	var matches []match
+	for st := 0; st <= favoriteMaxSpaceType; st++ {
+		favs, err := ww.GetFavoriteLocations(st)
+		if err != nil {
+			return nil, fmt.Errorf("failed to look up favorites (space_type %d): %w", st, err)
+		}
+		for _, f := range favs.FavoriteLocations {
+			if f.LocationID == uuid && f.Hmy > 0 {
+				matches = append(matches, match{id: f.Hmy, spaceType: st})
+			}
+		}
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("location %s is not in your favorites", uuid)
+	}
+
+	var last map[string]any
+	for _, m := range matches {
+		last, err = ww.MarkFavoriteLocation(favoriteRequest("", m.spaceType, true, m.id))
+		if err != nil {
+			return nil, fmt.Errorf("failed to remove favorite (id %d): %w", m.id, err)
+		}
+	}
+	return last, nil
+}
+
+// favoriteRequest builds the mark-as-favorite payload with the app's default
+// platform/application/location classification.
+func favoriteRequest(locationUUID string, spaceType int, remove bool, id int) wework.MarkFavoriteLocationRequest {
+	return wework.MarkFavoriteLocationRequest{
+		ID:                  id,
+		LocationID:          locationUUID,
+		SpaceType:           spaceType,
+		IsDeleted:           remove,
+		LocationType:        favoriteLocationType,
+		LocationAccountType: favoriteAccountType,
+		PlatformType:        favoritePlatformType,
+		ApplicationType:     favoriteApplicationType,
+	}
+}
+
+// PrintQueue returns the member's current print queue.
+func (s *Service) PrintQueue(ctx context.Context, input PrintQueueInput) (*wework.PrintQueueResponse, error) {
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return nil, err
+	}
+	return ww.GetPrintQueue(ctx, input.JobIDs)
+}
+
+// AddPrintJob uploads a base64-encoded document to the member's print queue.
+func (s *Service) AddPrintJob(ctx context.Context, input AddPrintJobInput) (*wework.PrintJob, error) {
+	if strings.TrimSpace(input.FileName) == "" {
+		return nil, fmt.Errorf("file_name is required")
+	}
+	fileBytes, err := decodeBase64Loose(input.FileBase64)
+	if err != nil {
+		return nil, fmt.Errorf("file_base64 is not valid base64: %w", err)
+	}
+	if len(fileBytes) == 0 {
+		return nil, fmt.Errorf("file_base64 is required")
+	}
+	ww, err := s.clientForRequest()
+	if err != nil {
+		return nil, err
+	}
+	return ww.AddToPrintQueue(ctx, wework.AddPrintJobRequest{
+		Copies:               input.Copies,
+		ForceMediaSize:       input.ForceMediaSize,
+		OrientationRequested: input.Orientation,
+		PrintColorMode:       input.ColorMode,
+		Sides:                input.Sides,
+		JobName:              input.JobName,
+		FileName:             input.FileName,
+		FileContentType:      input.FileContentType,
+		FileBytes:            fileBytes,
+	})
+}
+
+// decodeBase64Loose decodes base64 that may arrive with surrounding or internal
+// whitespace — LLMs often wrap long payloads at 76 columns like PEM — and may use
+// either the standard or URL-safe alphabet, with or without padding.
+func decodeBase64Loose(s string) ([]byte, error) {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch r {
+		case ' ', '\t', '\n', '\r', '\v', '\f':
+			continue
+		default:
+			b.WriteRune(r)
+		}
+	}
+	cleaned := b.String()
+
+	var err error
+	for _, enc := range []*base64.Encoding{
+		base64.StdEncoding,
+		base64.URLEncoding,
+		base64.RawStdEncoding,
+		base64.RawURLEncoding,
+	} {
+		var decoded []byte
+		if decoded, err = enc.DecodeString(cleaned); err == nil {
+			return decoded, nil
+		}
+	}
+	return nil, err
 }
 
 func reservableTypeName(space wework.Workspace) string {

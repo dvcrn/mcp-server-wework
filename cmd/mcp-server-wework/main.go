@@ -127,6 +127,70 @@ func main() {
 		return service.CancelBooking(ctx, input)
 	})
 
+	addTool(server, &mcp.Tool{
+		Name:        "favorites",
+		Description: "List the member's favorite and recent WeWork locations for a space type. space_type must be 0-3 (defaults to 0); other values are rejected by the API.",
+		InputSchema: objSchema(map[string]any{
+			"space_type": intSchema("Space type to query, 0-3. Defaults to 0."),
+		}),
+	}, func(ctx context.Context, input app.FavoritesInput) (app.FavoritesResult, error) {
+		return service.Favorites(ctx, input)
+	})
+
+	addTool(server, &mcp.Tool{
+		Name:        "add_favorite",
+		Description: "Favorite a WeWork location, identified by location_uuid or by city + name.",
+		InputSchema: objSchema(map[string]any{
+			"location_uuid": strSchema("Location UUID to favorite. Alternatively provide city + name."),
+			"city":          strSchema("City name, used together with name when location_uuid is omitted."),
+			"name":          strSchema("Location name, used together with city when location_uuid is omitted."),
+			"space_type":    intSchema("Space type, 0-3. Defaults to 0."),
+		}),
+	}, func(ctx context.Context, input app.AddFavoriteInput) (any, error) {
+		return service.AddFavorite(ctx, input)
+	})
+
+	addTool(server, &mcp.Tool{
+		Name:        "remove_favorite",
+		Description: "Remove a WeWork location from the member's favorites, identified by location_uuid, city + name, or an exact hmy id.",
+		InputSchema: objSchema(map[string]any{
+			"location_uuid": strSchema("Location UUID to remove. Alternatively provide city + name, or hmy."),
+			"city":          strSchema("City name, used together with name when location_uuid is omitted."),
+			"name":          strSchema("Location name, used together with city when location_uuid is omitted."),
+			"hmy":           intSchema("Exact favorite id (the hmy value from the favorites tool). Skips lookup when provided."),
+		}),
+	}, func(ctx context.Context, input app.RemoveFavoriteInput) (any, error) {
+		return service.RemoveFavorite(ctx, input)
+	})
+
+	addTool(server, &mcp.Tool{
+		Name:        "print_queue",
+		Description: "List the member's WeWork print hub queue.",
+		InputSchema: objSchema(map[string]any{
+			"job_ids": strSchema("Optional comma-separated job ids to filter by. Defaults to the full queue."),
+		}),
+	}, func(ctx context.Context, input app.PrintQueueInput) (any, error) {
+		return service.PrintQueue(ctx, input)
+	})
+
+	addTool(server, &mcp.Tool{
+		Name:        "add_print_job",
+		Description: "Upload a document to the member's WeWork print hub queue. Provide the file as base64.",
+		InputSchema: objSchema(map[string]any{
+			"file_name":         strSchema("File name, e.g. document.pdf."),
+			"file_base64":       strSchema("Base64-encoded file contents."),
+			"file_content_type": strSchema("MIME type of the file. Defaults to application/octet-stream."),
+			"job_name":          strSchema("Optional job name. Defaults to the file name."),
+			"copies":            intSchema("Number of copies. Defaults to 1."),
+			"orientation":       strSchema("Orientation, e.g. portrait or landscape. Defaults to portrait."),
+			"color_mode":        strSchema("Color mode, e.g. monochrome or color. Defaults to monochrome."),
+			"sides":             strSchema("Sides, e.g. one-sided or two-sided-long-edge. Defaults to one-sided."),
+			"force_media_size":  strSchema("Optional media size override."),
+		}, "file_name", "file_base64"),
+	}, func(ctx context.Context, input app.AddPrintJobInput) (any, error) {
+		return service.AddPrintJob(ctx, input)
+	})
+
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil && !isExpectedStdioClose(err) {
 		log.Fatal(err)
 	}
@@ -161,4 +225,8 @@ func strSchema(description string) map[string]any {
 
 func boolSchema(description string) map[string]any {
 	return map[string]any{"type": "boolean", "description": description}
+}
+
+func intSchema(description string) map[string]any {
+	return map[string]any{"type": "integer", "description": description}
 }

@@ -1,6 +1,49 @@
 package app
 
-import "testing"
+import (
+	"bytes"
+	"encoding/base64"
+	"testing"
+)
+
+func TestDecodeBase64Loose(t *testing.T) {
+	want := bytes.Repeat([]byte("The quick brown fox. "), 20)
+	std := base64.StdEncoding.EncodeToString(want)
+
+	// Simulate 76-column PEM-style wrapping with internal newlines.
+	var wrapped string
+	for i := 0; i < len(std); i += 76 {
+		end := i + 76
+		if end > len(std) {
+			end = len(std)
+		}
+		wrapped += std[i:end] + "\n"
+	}
+
+	cases := map[string]string{
+		"plain":            std,
+		"wrapped":          wrapped,
+		"leading/trailing": "  \n" + std + "\n  ",
+		"spaces inside":    std[:10] + " " + std[10:],
+		"url-safe":         base64.URLEncoding.EncodeToString(want),
+		"raw (no padding)": base64.RawStdEncoding.EncodeToString(want),
+	}
+	for name, in := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := decodeBase64Loose(in)
+			if err != nil {
+				t.Fatalf("decodeBase64Loose: %v", err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Fatalf("decoded mismatch for %s", name)
+			}
+		})
+	}
+
+	if _, err := decodeBase64Loose("not valid base64!!!"); err == nil {
+		t.Fatal("expected error for invalid input")
+	}
+}
 
 func TestParseDateSelection(t *testing.T) {
 	t.Run("single date", func(t *testing.T) {
