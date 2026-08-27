@@ -16,16 +16,14 @@ func tokyoBooking(t *testing.T) *wework.Booking {
 	}
 
 	booking := &wework.Booking{
-		UUID:     "1000001",
-		TimeZone: "Asia/Tokyo",
-		Reservable: &wework.SharedWorkspace{
-			UUID:     "00000000-0000-4000-8000-000000000001",
-			TypeName: "SharedWorkspace",
-			Location: &wework.SharedWorkspaceLocation{
-				UUID:     "00000000-0000-4000-8000-000000000002",
-				Name:     "Shibuya Scramble Square",
-				TimeZone: "Asia/Tokyo",
-			},
+		BookingID: "1000001",
+		TimeZone:  "Asia/Tokyo",
+		SpaceID:   "00000000-0000-4000-8000-000000000001",
+		SpaceName: "Daily Desk",
+		Location: &wework.BookingLocation{
+			UUID:     "00000000-0000-4000-8000-000000000002",
+			Name:     "Shibuya Scramble Square",
+			TimeZone: "Asia/Tokyo",
 		},
 	}
 	booking.StartsAt.Time = time.Date(2026, 9, 11, 9, 0, 0, 0, loc)
@@ -62,7 +60,7 @@ func TestCompactBookingCarriesTimezone(t *testing.T) {
 func TestCompactBookingWarnsWhenTimezoneUnknown(t *testing.T) {
 	booking := tokyoBooking(t)
 	booking.TimeZone = ""
-	booking.Reservable.Location.TimeZone = ""
+	booking.Location.TimeZone = ""
 
 	got := compactBookingFromModel(booking)
 

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -535,14 +536,14 @@ func (s *Service) Calendar(ctx context.Context, input CalendarInput) (CalendarOu
 	cal.SetVersion("2.0")
 
 	for _, booking := range allBookings {
-		if booking == nil || booking.Reservable == nil || booking.Reservable.Location == nil {
+		if booking == nil || booking.Location == nil {
 			continue
 		}
-		event := cal.AddEvent(booking.UUID)
-		event.SetSummary(fmt.Sprintf("WeWork: %s", booking.Reservable.Location.Name))
-		event.SetProperty(ics.ComponentProperty("DTSTART;TZID="+booking.Reservable.Location.TimeZone), booking.StartsAt.Format("20060102"))
-		event.SetProperty(ics.ComponentProperty("DTEND;TZID="+booking.Reservable.Location.TimeZone), booking.StartsAt.Format("20060102"))
-		event.SetProperty(ics.ComponentProperty("TZID"), booking.Reservable.Location.TimeZone)
+		event := cal.AddEvent(booking.BookingID)
+		event.SetSummary(fmt.Sprintf("WeWork: %s", booking.Location.Name))
+		event.SetProperty(ics.ComponentProperty("DTSTART;TZID="+booking.Location.TimeZone), booking.StartsAt.Format("20060102"))
+		event.SetProperty(ics.ComponentProperty("DTEND;TZID="+booking.Location.TimeZone), booking.StartsAt.Format("20060102"))
+		event.SetProperty(ics.ComponentProperty("TZID"), booking.Location.TimeZone)
 		event.SetProperty("X-MICROSOFT-CDO-ALLDAYEVENT", "TRUE")
 		event.SetProperty("X-MICROSOFT-CDO-BUSYSTATUS", "FREE")
 		event.SetProperty("X-MICROSOFT-CDO-IMPORTANCE", "1")
@@ -551,14 +552,14 @@ func (s *Service) Calendar(ctx context.Context, input CalendarInput) (CalendarOu
 		event.SetProperty("X-MOZ-LASTACK", "0")
 		event.SetProperty("TRANSP", "TRANSPARENT")
 		event.SetProperty("URL", "https://members.wework.com/workplaceone/content2/your-bookings")
-		event.SetLocation(booking.Reservable.Location.Address.Line1)
+		event.SetLocation(booking.Location.Address.Line1)
 		event.SetDescription(fmt.Sprintf(
 			"WeWork Booking Details:\nLocation: %s\nAddress: %s\nTime: %s - %s\nBooking ID: %s",
-			booking.Reservable.Location.Name,
-			booking.Reservable.Location.Address.Line1,
+			booking.Location.Name,
+			booking.Location.Address.Line1,
 			booking.StartsAt.Format("03:04 PM"),
 			booking.EndsAt.Format("03:04 PM"),
-			booking.UUID,
+			booking.BookingID,
 		))
 	}
 
@@ -935,7 +936,7 @@ func compactBookingFromModel(booking *wework.Booking) CompactBooking {
 	startsAt := booking.StartsAt.Time
 	endsAt := booking.EndsAt.Time
 
-	result.UUID = booking.UUID
+	result.UUID = booking.BookingID
 	result.Date = startsAt.Format("2006-01-02")
 	result.StartTime = startsAt.Format("15:04")
 	result.EndTime = endsAt.Format("15:04")
@@ -948,18 +949,13 @@ func compactBookingFromModel(booking *wework.Booking) CompactBooking {
 		result.StartsAtUTC = startsAt.UTC().Format(time.RFC3339)
 		result.EndsAtUTC = endsAt.UTC().Format(time.RFC3339)
 	}
-	if booking.CreditOrder != nil {
-		result.Credits = booking.CreditOrder.Price
-	}
-	if booking.Reservable != nil {
-		result.ReservableUUID = booking.Reservable.UUID
-		result.ReservableType = booking.Reservable.TypeName
-		if booking.Reservable.Location != nil {
-			result.LocationName = booking.Reservable.Location.Name
-			result.LocationUUID = booking.Reservable.Location.UUID
-			result.Address = booking.Reservable.Location.Address.Line1
-			result.City = booking.Reservable.Location.Address.City
-		}
+	result.Credits = strconv.FormatFloat(booking.CreditCost, 'f', -1, 64)
+	result.ReservableUUID = booking.SpaceID
+	if booking.Location != nil {
+		result.LocationName = booking.Location.Name
+		result.LocationUUID = booking.Location.UUID
+		result.Address = booking.Location.Address.Line1
+		result.City = booking.Location.Address.City
 	}
 	return result
 }
@@ -970,8 +966,8 @@ func bookingTimezone(booking *wework.Booking) string {
 	if booking.TimeZone != "" {
 		return booking.TimeZone
 	}
-	if booking.Reservable != nil && booking.Reservable.Location != nil {
-		return booking.Reservable.Location.TimeZone
+	if booking.Location != nil {
+		return booking.Location.TimeZone
 	}
 	return ""
 }
